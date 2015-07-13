@@ -10,15 +10,15 @@ This will search the default contacts folder using the ResolveName operation in 
 <br />
 Because ResolveName allows you to resolve against more then just the Email address I've added a -Partial Switch so you can also do partial match searches. Eg to return all the contacts that contain a particular word (note this could be across all the properties that are searched) you can use<br />
 <br />
-Get-Contact -MailboxName <a href="mailto:mailbox@domain.com">mailbox@domain.com</a> -EmailAddress glen -Parital<br />
+Get-Contact -MailboxName <a href="mailto:mailbox@domain.com">mailbox@domain.com</a> -EmailAddress glen -Partial<br />
 <br />
 By default only the Primary Email of&nbsp;a contact&nbsp;is checked when you using ResolveName if you want it to search the multivalued Proxyaddressses property you need to use something like the following<br />
 <br />
-Get-Contact -MailboxName&nbsp; <a href="mailto:mailbox@domain.com">mailbox@domain.com</a>&nbsp;-EmailAddress <a href="mailto:info@domain.com">smtp:info@domain.com</a>&nbsp;-Parital<br />
+Get-Contact -MailboxName&nbsp; <a href="mailto:mailbox@domain.com">mailbox@domain.com</a>&nbsp;-EmailAddress <a href="mailto:info@domain.com">smtp:info@domain.com</a>&nbsp;-Partial<br />
 <br />
 Or to search via the SIP address you can use<br />
 <br />
-Get-Contact -MailboxName&nbsp; <a href="mailto:mailbox@domain.com">mailbox@domain.com</a>&nbsp;-EmailAddress <a href="mailto:info@domain.com">sip:info@domain.com</a>&nbsp;-Parital<br />
+Get-Contact -MailboxName&nbsp; <a href="mailto:mailbox@domain.com">mailbox@domain.com</a>&nbsp;-EmailAddress <a href="mailto:info@domain.com">sip:info@domain.com</a>&nbsp;-Partial<br />
 <br />
 (using the Partial switch is required in this case because the EmailAddress your search on won't match the PrimaryAddress of the contact so in this case also you can get partial matches back).<br />
 <br />

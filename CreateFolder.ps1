@@ -1,6 +1,6 @@
 ﻿function Connect-Exchange{ 
     param( 
-    	[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+    		[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
 		[Parameter(Position=1, Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials
     )  
  	Begin
@@ -117,7 +117,7 @@ $TASource=@'
 
 function Get-FolderFromPath{
 	param (
-	        [Parameter(Position=0, Mandatory=$true)] [string]$FolderPath,
+			[Parameter(Position=0, Mandatory=$true)] [string]$FolderPath,
 			[Parameter(Position=1, Mandatory=$true)] [string]$MailboxName,
 			[Parameter(Position=2, Mandatory=$true)] [Microsoft.Exchange.WebServices.Data.ExchangeService]$service,
 			[Parameter(Position=3, Mandatory=$false)] [Microsoft.Exchange.WebServices.Data.PropertySet]$PropertySet
@@ -187,7 +187,7 @@ function Get-FolderFromPath{
 ########################
 function Create-Folder{
     param( 
-    	[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+    		[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
 		[Parameter(Position=1, Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
 		[Parameter(Position=2, Mandatory=$true)] [String]$NewFolderName,
 		[Parameter(Position=3, Mandatory=$false)] [String]$ParentFolder,

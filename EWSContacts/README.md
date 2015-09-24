@@ -31,8 +31,13 @@ In this case the contact object returned will be read only (although you can sav
 Finally if your contacts aren't located in the default contacts folder you can&nbsp;use the folder parameter to enter in the path to folder that you want&nbsp;to search&nbsp;eg<br />
 <br />
 Get-Contact -MailboxName <a href="mailto:mailbox@domain.com">mailbox@domain.com</a> -EmailAddress <a href="mailto:gscales@domain.com">gscales@domain.com</a> -Folder "\Contacts\SubFolder"<br />
-<br />
-<strong>Create-Contact</strong><br />
+<br><br><strong>Get-Contacts <br><br></strong>This can be used to get all the 
+contacts from a contacts folder in a Mailbox
+<p>Example 1 To get a Contact from a Mailbox's default contacts folder<br>
+Get-Contacts -MailboxName mailbox@domain.com <br><br>Example 2 To get all the 
+Contacts from subfolder of the Mailbox's default contacts folder<br>Get-Contacts 
+-MailboxName mailbox@domain.com -Folder \Contact\test</p>
+&nbsp;<strong><br>Create-Contact</strong><br />
 <br />
 This can be used to create a contact, I've added parameters for all the most common properties you would set in a contact but I haven't added any Extended properties (if you need to set this you can either add it in yourself or after you create the contact use Get-Contact and update the contact object).<br />
 <br />
@@ -112,3 +117,18 @@ Example 2&nbsp;Copy a GAL contact to a Contacts subfolder<br />
 <br />
 Copy-Contacts.GalToMailbox -MailboxName&nbsp;<a href="mailto:mailbox@domain.com">mailbox@domain.com</a> -EmailAddress&nbsp;<a href="mailto:email@domain.com">email@domain.com</a>&nbsp;&nbsp;-Folder \Contacts\UnderContacts<br />
 <br />
+<p><strong>Get-ContactGroup </strong></p>
+<p>This Cmdlet can be used to get a ContactGroup from a Mailbox</p>
+<p>Example 1 To Get a Contact Group in the default contacts folder <br><br>
+Get-ContactGroup -Mailboxname mailbox@domain.com -GroupName GroupName <br><br>
+Example 2 To Get a Contact Group in a subfolder of default contacts folder <br>
+<br>Get-ContactGroup -Mailboxname mailbox@domain.com -GroupName GroupName 
+-Folder \Contacts\Folder1 </p>
+<p><strong>Create-ContactGroup</strong></p>
+<p>Example 1 To create a Contact Group in the default contacts folder <br><br>
+Create-ContactGroup -Mailboxname mailbox@domain.com -GroupName GroupName 
+-Members (&quot;member1@domain.com&quot;,&quot;member2@domain.com&quot;)<br><br>Example 2 To create 
+a Contact Group in a subfolder of default contacts folder <br><br>
+Create-ContactGroup -Mailboxname mailbox@domain.com -GroupName GroupName -Folder 
+\Contacts\Folder1 -Members (&quot;member1@domain.com&quot;,&quot;member2@domain.com&quot;)</p>
+

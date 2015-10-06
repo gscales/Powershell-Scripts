@@ -139,7 +139,16 @@ function Get-UnReadMessageCount{
     )  
  	Begin
 	{
-		$rptObj = "" | select  MailboxName,Mailboxsize,LastLogon,LastLogonAccount,LastXMonthsTotal,LastXMonthsUnread,LastMailRecieved,LastXMonthsSent,LastMailSent  
+		$eval1 = "Last" + $Months + "MonthsTotal"
+		$eval2 = "Last" + $Months + "MonthsUnread"
+		$eval3 = "Last" + $Months + "MonthsSent"
+		$eval4 = "Last" + $Months + "MonthsReplyToSender"
+		$eval5 = "Last" + $Months + "MonthsReplyToAll"
+		$eval6 = "Last" + $Months + "MonthForward"
+		$reply = 0;
+		$replyall = 0
+		$forward = 0
+		$rptObj = "" | select  MailboxName,Mailboxsize,LastLogon,LastLogonAccount,$eval1,$eval2,$eval4,$eval5,$eval6,LastMailRecieved,$eval3,LastMailSent  
 		$rptObj.MailboxName = $MailboxName  
 		if($url){
 			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url 
@@ -150,8 +159,7 @@ function Get-UnReadMessageCount{
 		if($useImpersonation.IsPresent){
 			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName) 
 		}
-		$Range = [system.DateTime]::Now.AddMonths(-$Months).ToString("yyyy-MM-dd") + ".." + [system.DateTime]::Now.ToString("yyyy-MM-dd")   
-		$AQSString1 = "System.Message.DateReceived:" + $Range   
+		$AQSString1 = "System.Message.DateReceived:>" + [system.DateTime]::Now.AddMonths(-$Months).ToString("yyyy-MM-dd")   
   		$folderid= new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox,$MailboxName)     
 		$Inbox = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderid)  
   		$folderid= new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::SentItems,$MailboxName)     
@@ -160,6 +168,8 @@ function Get-UnReadMessageCount{
 		$psPropset= new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::IdOnly)  
 		$psPropset.Add([Microsoft.Exchange.WebServices.Data.ItemSchema]::DateTimeReceived)
 		$psPropset.Add([Microsoft.Exchange.WebServices.Data.EmailMessageSchema]::IsRead)
+		$PidTagLastVerbExecuted = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x1081,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Integer); 
+		$psPropset.Add($PidTagLastVerbExecuted)
 		$ivItemView.PropertySet = $psPropset
   		$MailboxStats = Get-MailboxStatistics $MailboxName  
 		$ts = CovertBitValue($MailboxStats.TotalItemSize.ToString())  
@@ -169,34 +179,48 @@ function Get-UnReadMessageCount{
 		$rptObj.LastLogon = $MailboxStats.LastLogonTime  
 		write-host ("Last Logon Account : " + $MailboxStats.LastLoggedOnUserAccount ) 
 		$rptObj.LastLogonAccount = $MailboxStats.LastLoggedOnUserAccount  
-		$fiItems = $Inbox.findItems($AQSString1,$ivItemView)  
-		$rptObj.LastXMonthsTotal = $fiItems.TotalCount  
-		write-host ("Last " + $Months + " Months : " + $fiItems.TotalCount)
-		if($fiItems.TotalCount -gt 0){  
-		    write-host ("Last Mail Recieved : " + $fiItems.Items[0].DateTimeReceived ) 
-		    $rptObj.LastMailRecieved = $fiItems.Items[0].DateTimeReceived  
-		}
+		$fiItems = $null
 		$unreadCount = 0
-		if($fiItems.MoreAvailable){
-	   		do{    
-			    $fiItems = $service.FindItems($Inbox.Id,$ivItemView)		    
+		$settc = $true
+	   	do{ 
+			$fiItems = $Inbox.findItems($AQSString1,$ivItemView)  
+			if($settc){
+				$rptObj.$eval1 = $fiItems.TotalCount  
+				write-host ("Last " + $Months + " Months : " + $fiItems.TotalCount)
+				if($fiItems.TotalCount -gt 0){  
+			    	write-host ("Last Mail Recieved : " + $fiItems.Items[0].DateTimeReceived ) 
+			    	$rptObj.LastMailRecieved = $fiItems.Items[0].DateTimeReceived  
+				}		    
+				$settc = $false
+			}
 			    foreach($Item in $fiItems.Items){
 					$unReadVal = $null
 					if($Item.TryGetProperty([Microsoft.Exchange.WebServices.Data.EmailMessageSchema]::IsRead,[ref]$unReadVal)){
 						if(!$unReadVal){
 							$unreadCount++
 						}
-					}      
+					} 
+				   $lastVerb = $null
+					if($Item.TryGetProperty($PidTagLastVerbExecuted,[ref]$lastVerb)){
+						switch($lastVerb){
+							102 { $reply++ }
+							103 { $replyall++}
+							104 { $forward++}
+						}
+					} 
 			    }    
 			    $ivItemView.Offset += $fiItems.Items.Count    
 			}while($fiItems.MoreAvailable -eq $true) 
-		}
+
 		write-host ("Last " + $Months + " Months Unread : " + $unreadCount ) 
-		$rptObj.LastXMonthsUnread = $unreadCount  
+		$rptObj.$eval2 = $unreadCount  
+		$rptObj.$eval4 = $reply
+		$rptObj.$eval5 = $replyall
+		$rptObj.$eval6 = $forward
 		$ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1)  
 		$fiResults = $SentItems.findItems($AQSString1,$ivItemView)  
 		write-host ("Last " + $Months + " Months Sent : " + $fiResults.TotalCount  )
-		$rptObj.LastXMonthsSent = $fiResults.TotalCount  
+		$rptObj.$eval3 = $fiResults.TotalCount  
 		if($fiResults.TotalCount -gt 0){  
 		    write-host ("Last Mail Sent Date : " + $fiResults.Items[0].DateTimeSent  )
 		    $rptObj.LastMailSent = $fiResults.Items[0].DateTimeSent  

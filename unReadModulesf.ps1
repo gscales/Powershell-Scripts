@@ -169,7 +169,8 @@ function Get-UnReadMessageCount{
 		$psPropset.Add([Microsoft.Exchange.WebServices.Data.ItemSchema]::DateTimeReceived)
 		$psPropset.Add([Microsoft.Exchange.WebServices.Data.EmailMessageSchema]::IsRead)
 		$PidTagLastVerbExecuted = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x1081,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Integer);
-		$sfItemSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsEqualTo([Microsoft.Exchange.WebServices.Data.EmailMessageSchema]::IsRead, $false) 
+		#Find Items Greater then 35 MB
+		$sfItemSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsGreaterThan([Microsoft.Exchange.WebServices.Data.ItemSchema]::DateTimeReceived,[system.DateTime]::Now.AddMonths(-$Months)) 
 		$psPropset.Add($PidTagLastVerbExecuted)
 		$ivItemView.PropertySet = $psPropset
   		$MailboxStats = Get-MailboxStatistics $MailboxName  
@@ -219,7 +220,7 @@ function Get-UnReadMessageCount{
 		$rptObj.$eval5 = $replyall
 		$rptObj.$eval6 = $forward
 		$ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1)  
-		$fiResults = $SentItems.findItems($AQSString1,$ivItemView)  
+		$fiResults = $SentItems.findItems($sfItemSearchFilter,$ivItemView)  
 		write-host ("Last " + $Months + " Months Sent : " + $fiResults.TotalCount  )
 		$rptObj.$eval3 = $fiResults.TotalCount  
 		if($fiResults.TotalCount -gt 0){  

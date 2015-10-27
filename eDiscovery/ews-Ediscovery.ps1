@@ -376,6 +376,58 @@ function Exec-eDiscoveryKeyWordStats
 		
 		}
 }
+function Exec-eDiscoveryKeyWordStatsMultiMailbox
+{
+	[CmdletBinding()]
+	param(
+		[Parameter(Position=0, Mandatory=$true)] [Microsoft.Exchange.WebServices.Data.ExchangeService]$service,
+		[Parameter(Position=1, Mandatory=$true)] [String]$KQL,
+		[Parameter(Position=2, Mandatory=$true)] [psObject]$Mailboxes
+	)
+	Begin 
+		{
+			$searchArray = @()
+			foreach($mailbox in $Mailboxes){
+			$gsMBResponse = $service.GetSearchableMailboxes($mailbox, $false);
+				foreach ($sbMailbox in $gsMBResponse.SearchableMailboxes)
+				{					
+					if($sbMailbox.SMTPAddress.ToLower() -eq $mailbox.ToLower()){
+						$searchArray +=$sbMailbox
+					}										
+				}
+			}
+			$msbScope = New-Object  Microsoft.Exchange.WebServices.Data.MailboxSearchScope[] $searchArray.Count
+			$mbCount = 0;
+			foreach ($sbMailbox in $searchArray)
+			{
+			    $msbScope[$mbCount] = New-Object Microsoft.Exchange.WebServices.Data.MailboxSearchScope($sbMailbox.ReferenceId, [Microsoft.Exchange.WebServices.Data.MailboxSearchLocation]::All);
+			    $mbCount++;
+			}
+			$smSearchMailbox = New-Object Microsoft.Exchange.WebServices.Data.SearchMailboxesParameters
+			$mbq =  New-Object Microsoft.Exchange.WebServices.Data.MailboxQuery($KQL, $msbScope);
+			$mbqa = New-Object Microsoft.Exchange.WebServices.Data.MailboxQuery[] 1
+			$mbqa[0] = $mbq
+			$smSearchMailbox.SearchQueries = $mbqa;
+			$smSearchMailbox.PageSize = 100;
+			$smSearchMailbox.PageDirection = [Microsoft.Exchange.WebServices.Data.SearchPageDirection]::Next;
+			$smSearchMailbox.PerformDeduplication = $false;           
+			$smSearchMailbox.ResultType = [Microsoft.Exchange.WebServices.Data.SearchResultType]::StatisticsOnly;
+			$srCol = $service.SearchMailboxes($smSearchMailbox);
+			$rptCollection = @()
+			if ($srCol[0].Result -eq [Microsoft.Exchange.WebServices.Data.ServiceResult]::Success)
+			{
+				foreach($KeyWorkdStat in $srCol[0].SearchResult.KeywordStats){
+						$rptObj = "" | Select Name,ItemHits,Size
+						$rptObj.Name = $KeyWorkdStat.Keyword
+						$rptObj.ItemHits = $KeyWorkdStat.ItemHits
+						$rptObj.Size = [System.Math]::Round($KeyWorkdStat.Size /1024/1024,2)
+						$rptCollection += $rptObj
+				}   
+			}
+			Write-Output $rptCollection
+		
+		}
+}
 function Exec-eDiscoveryPreviewItemsStats
 {
     [CmdletBinding()] 
@@ -462,6 +514,60 @@ function Exec-eDiscoveryPreviewItemsStats
 		            $srCol = $service.SearchMailboxes($smSearchMailbox);
 					Write-Host("Items Remaining : " + $srCol[0].SearchResult.ItemCount);
 		        } while ($srCol[0].SearchResult.ItemCount-gt 0 );
+		        
+		    }		    
+		}
+		Write-Output $rptCollection.Values 
+	}
+}
+function Exec-eDiscoveryPreviewItemsStatsMultiMailbox
+{
+    [CmdletBinding()] 
+    param( 
+		[Parameter(Position=0, Mandatory=$true)] [Microsoft.Exchange.WebServices.Data.ExchangeService]$service,
+		[Parameter(Position=1, Mandatory=$true)] [String]$KQL,
+		[Parameter(Position=2, Mandatory=$true)] [psObject]$Mailboxes
+		
+    )  
+ 	Begin
+	{
+		
+		$FolderCache = @{}
+		$searchArray = @()
+		foreach($mailbox in $Mailboxes){
+		$gsMBResponse = $service.GetSearchableMailboxes($mailbox, $false);
+			foreach ($sbMailbox in $gsMBResponse.SearchableMailboxes)
+			{					
+				if($sbMailbox.SMTPAddress.ToLower() -eq $mailbox.ToLower()){
+					$searchArray +=$sbMailbox
+				}										
+			}
+		}
+		$mbCount =0
+		$msbScope = New-Object  Microsoft.Exchange.WebServices.Data.MailboxSearchScope[] $searchArray.Count
+		foreach ($sbMailbox in $searchArray)
+		{
+		    $msbScope[$mbCount] = New-Object Microsoft.Exchange.WebServices.Data.MailboxSearchScope($sbMailbox.ReferenceId, [Microsoft.Exchange.WebServices.Data.MailboxSearchLocation]::All);
+		    $mbCount++;
+		}
+		$smSearchMailbox = New-Object Microsoft.Exchange.WebServices.Data.SearchMailboxesParameters
+		$mbq =  New-Object Microsoft.Exchange.WebServices.Data.MailboxQuery($KQL, $msbScope);
+		$mbqa = New-Object Microsoft.Exchange.WebServices.Data.MailboxQuery[] 1
+		$mbqa[0] = $mbq
+		$smSearchMailbox.SearchQueries = $mbqa;
+		$smSearchMailbox.PageSize = 1;
+		$smSearchMailbox.PageDirection = [Microsoft.Exchange.WebServices.Data.SearchPageDirection]::Next;
+		$smSearchMailbox.PerformDeduplication = $false;           
+		$smSearchMailbox.ResultType = [Microsoft.Exchange.WebServices.Data.SearchResultType]::PreviewOnly;
+		$srCol = $service.SearchMailboxes($smSearchMailbox);
+		$rptCollection = @{}
+
+		if ($srCol[0].Result -eq [Microsoft.Exchange.WebServices.Data.ServiceResult]::Success)
+		{
+			Write-Host ("Total Number of Items Found " + $srCol[0].SearchResult.ItemCount)
+		    if ($srCol[0].SearchResult.ItemCount -gt 0)
+		    {
+				write-output $srCol[0].SearchResult.MailboxStats
 		        
 		    }		    
 		}
@@ -680,4 +786,60 @@ function Get-MailboxAttachments
 				}
 			}
 		}
+}
+####################### 
+<# 
+.SYNOPSIS 
+ Peforms a Multi Mailbox KeyWordStats Search using eDiscovery and the Exchange Web Services API on Exchange 2013,Office365 and Exchange 2016 
+ 
+.DESCRIPTION 
+  Peforms a Multi Mailbox KeyWordStats Search using eDiscovery and the Exchange Web Services API on Exchange 2013,Office365 and Exchange 2016 
+  
+  Requires the EWS Managed API from https://www.microsoft.com/en-us/download/details.aspx?id=42951
+
+.EXAMPLE
+	Example 1 To search for the number of Contact in a group of Mailbox
+	 Search-MultiMailboxesKeyWordStats -Mailboxes 
+
+#> 
+########################
+function Search-MultiMailboxesKeyWordStats{
+    param( 
+    	[Parameter(Position=0, Mandatory=$true)] [PSObject]$Mailboxes,
+		[Parameter(Position=1, Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
+		[Parameter(Position=2, Mandatory=$true)] [String]$QueryString
+    )  
+ 	Begin
+	 {
+	 	$service = Connect-Exchange -MailboxName $Mailboxes[0] -Credentials $Credentials
+		Exec-eDiscoveryKeyWordStatsMultiMailbox -service $service -Mailboxes $Mailboxes -KQL $QueryString
+	 }
+}
+####################### 
+<# 
+.SYNOPSIS 
+ Peforms a Multi Mailbox Statistics Search using eDiscovery and the Exchange Web Services API on Exchange 2013,Office365 and Exchange 2016 
+ 
+.DESCRIPTION 
+  Peforms a Multi Mailbox Statistics Search using eDiscovery and the Exchange Web Services API on Exchange 2013,Office365 and Exchange 2016 
+  
+  Requires the EWS Managed API from https://www.microsoft.com/en-us/download/details.aspx?id=42951
+
+.EXAMPLE
+	Example 1 To search for the number of Contact in a group of Mailbox
+	 Search-MultiMailboxesItemStats -Mailboxes @('Mailbox@domain.com','mailbox2@domain.com')
+
+#> 
+########################
+function Search-MultiMailboxesItemStats{
+    param( 
+    	[Parameter(Position=0, Mandatory=$true)] [PSObject]$Mailboxes,
+		[Parameter(Position=1, Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
+		[Parameter(Position=2, Mandatory=$true)] [String]$QueryString
+    )  
+ 	Begin
+	 {
+	 	$service = Connect-Exchange -MailboxName $Mailboxes[0] -Credentials $Credentials
+		Exec-eDiscoveryPreviewItemsStatsMultiMailbox -service $service -Mailboxes $Mailboxes -KQL $QueryString
+	 }
 }

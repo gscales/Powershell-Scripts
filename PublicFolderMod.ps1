@@ -144,6 +144,95 @@ function Enum-PublicFolders
 	}
 }
 
+function Enum-MailPublicFolders
+{
+	param (
+    	[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+		[Parameter(Position=1, Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
+		[Parameter(Position=2, Mandatory=$false)] [switch]$useImpersonation,
+		[Parameter(Position=3, Mandatory=$false)] [String]$url
+		  )
+	process
+	{
+		$Script:rptCollection = @()
+		$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url
+		if($useImpersonation.IsPresent){
+			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)
+			$service.HttpHeaders.Add("X-AnchorMailbox", $MailboxName);  
+		}
+		$publicFolderRoot = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,[Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::PublicFoldersRoot)
+		Process-FolderMailEnabled -Folder $publicFolderRoot
+		Write-Output $Script:rptCollection
+	}
+}
+
+
+function Process-FolderMailEnabled
+{
+	param
+	(
+    	[Parameter(Position=0, Mandatory=$true)] [Microsoft.Exchange.WebServices.Data.Folder]$Folder
+		
+	)
+	process
+	{
+		$PidTagMessageSizeExtended = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0xe08,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Long);
+		$PidTagLocalCommitTimeMax = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x670A, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::SystemTime);  
+		$PR_HAS_RULES = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x663A, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Boolean);  
+		$fvFolderView =  New-Object Microsoft.Exchange.WebServices.Data.FolderView(1000)  
+		$psPropertySet = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)  
+		$PR_Folder_Path = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(26293, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::String);  
+		$PR_PF_PROXY = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x671D, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Binary);
+		$PR_ENTRYID = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x0FFF,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Binary)  
+		#Add Properties to the  Property Set  
+		$psPropertySet.Add($PR_Folder_Path); 
+		$psPropertySet.Add($PR_HAS_RULES);
+		$psPropertySet.Add($PidTagLocalCommitTimeMax);
+		$psPropertySet.Add($PidTagMessageSizeExtended);
+		$psPropertySet.Add($PR_PF_PROXY);
+		$psPropertySet.Add($PR_ENTRYID);
+		$fvFolderView.PropertySet = $psPropertySet; 
+		#Deep Transval will ensure all folders in the search path are returned  
+		$fvFolderView.Traversal = [Microsoft.Exchange.WebServices.Data.FolderTraversal]::Shallow;  
+		do {  
+		    $fiResult = $Service.FindFolders($Folder.Id,$fvFolderView)  
+		    foreach($ffFolder in $fiResult.Folders){  
+				$proxyguid = $null
+				if($ffFolder.TryGetProperty($PR_PF_PROXY,[ref]$proxyguid)){
+			        $foldpathval = $null  
+			        #Try to get the FolderPath Value and then covert it to a usable String   
+			        if ($ffFolder.TryGetProperty($PR_Folder_Path,[ref] $foldpathval))  
+			        {  
+			            $binarry = [Text.Encoding]::UTF8.GetBytes($foldpathval)  
+			            $hexArr = $binarry | ForEach-Object { $_.ToString("X2") }  
+			            $hexString = $hexArr -join ''  
+			            $hexString = $hexString.Replace("FEFF", "5C00")  
+			            $fpath = ConvertToString($hexString)  
+			        }
+					$EntryIdVal = $null
+					[Void]$ffFolder.TryGetProperty($PR_ENTRYID,[ref]$EntryIdVal)
+					Write-Host ("Found Mail-Eanbled Folder " + $fpath)
+					$Guidval = new-object -TypeName System.Guid -ArgumentList (,$proxyguid)
+					$rptObj = "" | Select FolderPath,Guid,EntryId
+					$rptObj.FolderPath = $fpath
+					$rptObj.Guid = $Guidval.ToString("D")
+					$rptObj.EntryId =  [System.BitConverter]::ToString($EntryIdVal).Replace("-","")
+					$Script:rptCollection += $rptObj
+				}
+				if($ffFolder.ChildFolderCount -gt 0)
+				{
+					Process-FolderMailEnabled -Folder $ffFolder 
+				}
+				
+		    } 
+		    $fvFolderView.Offset += $fiResult.Folders.Count
+		}while($fiResult.MoreAvailable -eq $true)  
+		
+	}
+	
+}
+
+
 function Process-Folder
 {
 	param

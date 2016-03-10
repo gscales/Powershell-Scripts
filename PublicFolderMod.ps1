@@ -9,7 +9,7 @@
 		Load-EWSManagedAPI
 		
 		## Set Exchange Version  
-		$ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2013_SP1
+		$ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2010_SP2
 		  
 		## Create Exchange Service Object  
 		$service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($ExchangeVersion)  

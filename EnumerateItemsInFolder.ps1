@@ -47,7 +47,7 @@ function Get-FolderItems
 		    #[Void]$service.LoadPropertiesForItems($fiItems,$ItemPropset)  
 		    foreach($Item in $fiItems.Items){      
 				#Process Item
-				Write-Host $Item.Subject
+				Write-Output $Item
 		    }    
 		    $ivItemView.Offset += $fiItems.Items.Count    
 		}while($fiItems.MoreAvailable -eq $true) 	

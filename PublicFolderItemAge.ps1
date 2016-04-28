@@ -11,7 +11,7 @@
  PS C:\>Get-FolderItems -MailboxName user.name@domain.com  -FolderPath '\Reporttest'
 
 #> 
-function Get-PublicFolderItems
+function Get-PublicFolderItemsAge
 { 
     [CmdletBinding()] 
     param( 
@@ -37,11 +37,16 @@ function Get-PublicFolderItems
         Get-PublicFolderRoutingHeader -service $service -Credentials $Credentials -MailboxName $MailboxName -Header "X-AnchorMailbox"
 		$fldId = PublicFolderIdFromPath -FolderPath $PublicFolderPath  -SmtpAddress $MailboxName -service $service		
         $SubFolderId =  new-object Microsoft.Exchange.WebServices.Data.FolderId($fldId)
-         
+        $minYear = (Get-Date).Year
+        $maxYear = (Get-Date).Year
+		$rptCollection = @{}
         
 		#Define ItemView to retrive just 1000 Items    
 		$ivItemView =  New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000) 
-		$ItemPropset= new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
+		$ItemPropset= new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::IdOnly)
+        $ItemPropset.Add([Microsoft.Exchange.WebServices.Data.ItemSchema]::Size)
+        $ItemPropset.Add([Microsoft.Exchange.WebServices.Data.ItemSchema]::DateTimeReceived)
+        $ItemPropset.Add([Microsoft.Exchange.WebServices.Data.ItemSchema]::DateTimeCreated)
 		$ivItemView.PropertySet = $ItemPropset
 		$rptCollection = @{}
 		$fiItems = $null    
@@ -51,10 +56,26 @@ function Get-PublicFolderItems
 		    #[Void]$service.LoadPropertiesForItems($fiItems,$ItemPropset)  
 		    foreach($Item in $fiItems.Items){      
 				#Process Item
-                Write-Host $Item.Subject
+				$dateVal = $null
+				if($Item.TryGetProperty([Microsoft.Exchange.WebServices.Data.ItemSchema]::DateTimeReceived,[ref]$dateVal )-eq $false){
+					$dateVal = $Item.DateTimeCreated
+				}
+				if($rptCollection.ContainsKey($dateVal.Year)){
+					$rptCollection[$dateVal.Year].TotalNumber += 1
+					$rptCollection[$dateVal.Year].TotalSize += [Int64]$Item.Size
+				}
+				else{
+					$rptObj = "" | Select Year,TotalNumber,TotalSize
+					$rptObj.TotalNumber = 1
+                    $rptObj.Year = $dateVal.Year
+					$rptObj.TotalSize = [Int64]$Item.Size
+					$rptCollection.add($dateVal.Year,$rptObj)
+					if($dateVal.Year -lt $minYear){$minYear = $dateVal.Year}
+				}
 		    }    
 		    $ivItemView.Offset += $fiItems.Items.Count    
 		}while($fiItems.MoreAvailable -eq $true) 
+		Write-Output $rptCollection.Values | Sort-Object -Property NumberOfItems -Descending
 		}
 }
 

@@ -248,13 +248,13 @@ function Create-Folder{
 
 .EXAMPLE
 	Example 1 To create a Folder named test in the Root of the Mailbox
-	 Create-Folder -Mailboxname mailbox@domain.com -NewFolderName test
+	Create-PublicFolder -Mailboxname mailbox@domain.com -NewFolderName test
 	
 	Example 2 To create a Folder as a SubFolder of the Public Folder
-	 Create-Folder -Mailboxname mailbox@domain.com -NewFolderName test -ParentPublicFolderPath '\Fodlder1\Folder2'
+	Create-PublicFolder -Mailboxname mailbox@domain.com -NewFolderName test -ParentPublicFolderPath '\Fodlder1\Folder2'
 	 
 	Example 3 To create a new Folder Contacts SubFolder of the Contacts Folder
-	Create-Folder -Mailboxname mailbox@domain.com -NewFolderName test -ParentPublicFolderPath '\Fodlder1\Folder2' -FolderClass IPF.Contact
+	Create-PublicFolder -Mailboxname mailbox@domain.com -NewFolderName test -ParentPublicFolderPath '\Fodlder1\Folder2' -FolderClass IPF.Contact
 
 
 #> 

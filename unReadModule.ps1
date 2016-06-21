@@ -9,7 +9,7 @@
 		Load-EWSManagedAPI
 		
 		## Set Exchange Version  
-		$ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2010_SP2
+		$ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2013
 		  
 		## Create Exchange Service Object  
 		$service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($ExchangeVersion)  
@@ -226,5 +226,129 @@ function Get-UnReadMessageCount{
 		    $rptObj.LastMailSent = $fiResults.Items[0].DateTimeSent  
 		}  
 		Write-Output $rptObj  
+	}
+}
+
+function Get-UnReadCountOnFolder  {
+	    param( 
+    	[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+		[Parameter(Position=1, Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
+		[Parameter(Position=2, Mandatory=$false)] [switch]$useImpersonation,
+		[Parameter(Position=3, Mandatory=$false)] [string]$url
+    )  
+ 	Begin
+	{
+		if($url){
+			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url 
+		}
+		else{
+			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials
+		}
+		if($useImpersonation.IsPresent){
+			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName) 
+		}
+  		$folderid= new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox,$MailboxName)     
+		$Inbox = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderid) 
+		Write-Host ("Total Message Count : " + $Inbox.TotalCount)
+		Write-Host ("Total Unread Message Count : " +$Inbox.UnreadCount)
+	}
+}
+
+function Mark-AllMessagesUnread{
+	    param( 
+    	[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+		[Parameter(Position=1, Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
+		[Parameter(Position=2, Mandatory=$false)] [switch]$useImpersonation,
+		[Parameter(Position=3, Mandatory=$false)] [string]$url,
+		[Parameter(Position=4, Mandatory=$true)] [string]$FolderPath
+    )  
+ 	Begin
+	{
+		if($url){
+			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url 
+		}
+		else{
+			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials
+		}
+		if($useImpersonation.IsPresent){
+			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName) 
+		}
+		$folderId = FolderIdFromPath -FolderPath $FolderPath -SmtpAddress $MailboxName
+		if($folderId -ne $null){
+			$Folder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderId) 
+			Write-Host ("Total Message Count : " + $Inbox.TotalCount)
+			Write-Host ("Total Unread Message Count : " +$Inbox.UnreadCount)
+			Write-Host ("Marking all messags a unread in folder")
+			$Folder.MarkAllItemsAsRead($true)
+		}
+	}	
+}
+function FolderIdFromPath{
+	param (
+	        $FolderPath = "$( throw 'Folder Path is a mandatory Parameter' )",
+			$SmtpAddress = "$( throw 'Folder Path is a mandatory Parameter' )"
+		  )
+	process{
+		## Find and Bind to Folder based on Path  
+		#Define the path to search should be seperated with \  
+		#Bind to the MSGFolder Root  
+		$folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::MsgFolderRoot,$SmtpAddress)   
+		$tfTargetFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderid)  
+		#Split the Search path into an array  
+		$fldArray = $FolderPath.Split("\") 
+		 #Loop through the Split Array and do a Search for each level of folder 
+		for ($lint = 1; $lint -lt $fldArray.Length; $lint++) { 
+	        #Perform search based on the displayname of each folder level 
+	        $fvFolderView = new-object Microsoft.Exchange.WebServices.Data.FolderView(1) 
+	        $SfSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsEqualTo([Microsoft.Exchange.WebServices.Data.FolderSchema]::DisplayName,$fldArray[$lint]) 
+	        $findFolderResults = $service.FindFolders($tfTargetFolder.Id,$SfSearchFilter,$fvFolderView) 
+	        if ($findFolderResults.TotalCount -gt 0){ 
+	            foreach($folder in $findFolderResults.Folders){ 
+	                $tfTargetFolder = $folder                
+	            } 
+	        } 
+	        else{ 
+	            "Error Folder Not Found"  
+	            $tfTargetFolder = $null  
+	            break  
+	        }     
+	    }  
+		if($tfTargetFolder -ne $null){
+			return $tfTargetFolder.Id
+		}
+		else{
+			throw "Folder not found"
+		}
+	}
+}
+
+
+function Mark-LastMessageReadinInbox  {
+	    param( 
+    	[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+		[Parameter(Position=1, Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
+		[Parameter(Position=2, Mandatory=$false)] [switch]$useImpersonation,
+		[Parameter(Position=3, Mandatory=$false)] [string]$url
+    )  
+ 	Begin
+	{
+		if($url){
+			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url 
+		}
+		else{
+			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials
+		}
+		if($useImpersonation.IsPresent){
+			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName) 
+		}
+  		$folderid= new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox,$MailboxName)     
+		$Inbox = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderid) 
+        $ivItemView =  New-Object Microsoft.Exchange.WebServices.Data.ItemView(1)
+		$fiItems = $service.FindItems($Inbox.Id,$ivItemView)
+		if($fiItems.Items.Count -eq 1)
+		{
+			$fiItems.Items[0].isRead = $true
+			$fiItems.Items[0].Update([Microsoft.Exchange.WebServices.Data.ConflictResolutionMode]::AutoResolve);					
+		}     
 	}
 }

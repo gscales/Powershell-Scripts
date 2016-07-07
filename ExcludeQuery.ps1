@@ -198,7 +198,7 @@ function Query-MessageFlag  {
 					$fiItems = $service.FindItems($Folder.Id,$sfItemSearchFilter,$ivItemView)    
 					#[Void]$service.LoadPropertiesForItems($fiItems,$psPropset)  
 					foreach($Item in $fiItems.Items){      
-					    Write-Host($Item.DateTimeReceived + " : " + $Item.Subject)       
+					    Write-Host($Item.DateTimeReceived.ToString() + " : " + $Item.Subject)       
 					}    
 					$ivItemView.Offset += $fiItems.Items.Count    
 				}while($fiItems.MoreAvailable -eq $true) 

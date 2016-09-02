@@ -174,7 +174,7 @@ function Like-Operation
 <?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
   <soap:Header>
-    <t:RequestServerVersion Version="Exchange2016"/>
+    <t:RequestServerVersion Version="V2015_10_05"/>
   </soap:Header>
   <soap:Body xmlns="http://schemas.microsoft.com/exchange/services/2006/messages">
     <LikeItem>
@@ -222,7 +222,7 @@ function UnLike-Operation
 <?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
   <soap:Header>
-    <t:RequestServerVersion Version="Exchange2016"/>
+    <t:RequestServerVersion Version="V2015_10_05"/>
   </soap:Header>
   <soap:Body xmlns="http://schemas.microsoft.com/exchange/services/2006/messages">
     <LikeItem>

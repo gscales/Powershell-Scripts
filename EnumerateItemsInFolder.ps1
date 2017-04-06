@@ -43,14 +43,29 @@ function Get-FolderItems
 		$rptCollection = @{}
 		$fiItems = $null    
 		do{    
-		    $fiItems = $service.FindItems($SubFolderId,$ivItemView)    
+		    $fiItems = $service.FindItems($SubFolderId,$ivItemView)   
+			Write-Host ("Processed " + $fiItems.Items.Count)
 		    #[Void]$service.LoadPropertiesForItems($fiItems,$ItemPropset)  
 		    foreach($Item in $fiItems.Items){      
 				#Process Item
-				Write-Output $Item
+				$EmailAddress = new-object System.Net.Mail.MailAddress($Item.Sender.Address)
+				if($rptCollection.ContainsKey($EmailAddress.Host))
+				{
+					$rptCollection[$EmailAddress.Host].NumberOfItems +=1
+					$rptCollection[$EmailAddress.Host].SizeOfItems = $Item.Size
+				}
+				else
+				{
+					$rptObj = "" | select Domain,NumberOfItems,SizeOfItems
+					$rptObj.Domain = $EmailAddress.Host
+					$rptObj.NumberOfItems = 1
+					$rptObj.SizeOfItems = $Item.Size
+					$rptCollection.Add($EmailAddress.Host,$rptObj)
+				}
 		    }    
 		    $ivItemView.Offset += $fiItems.Items.Count    
-		}while($fiItems.MoreAvailable -eq $true) 	
+		}while($fiItems.MoreAvailable -eq $true) 
+		Write-Output $rptCollection.Values | Sort-Object -Property NumberOfItems -Descending
 		}
 }
 

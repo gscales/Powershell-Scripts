@@ -351,21 +351,6 @@ function Get-MailboxTimeZone{
     }
 }
 
-function Get-Folders{
-    param( 
-        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
-        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
-    )
-    Begin{
-        if($AccessToken -eq $null)
-        {
-              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
-        }   
-        $HttpClient =  Get-HTTPClient($MailboxName)
-        $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/MailFolders/msgfolderroot/childfolders"
-        return Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
-    }
-}
 
 function Get-FolderFromPath{
 	param (
@@ -426,6 +411,264 @@ function Get-Inbox{
         return Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
     }
 }
+
+function Get-InboxItems{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }   
+        $HttpClient =  Get-HTTPClient($MailboxName)
+        $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/MailFolders/Inbox/messages/?`$select=ReceivedDateTime,Sender,Subject,IsRead,InferenceClassification`&`$Top=1000"
+        do{
+            $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+            foreach ($Message in $JSONOutput.Value) {
+                Write-Output $Message
+            }           
+            $RequestURL = $JSONOutput.'@odata.nextLink'
+        }while(![String]::IsNullOrEmpty($RequestURL))       
+
+    }
+}
+
+function Get-FocusedInboxItems{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }   
+        $HttpClient =  Get-HTTPClient($MailboxName)
+        $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/MailFolders/Inbox/messages/?`$select=ReceivedDateTime,Sender,Subject,IsRead,InferenceClassification`&`$Top=1000`&`$filter=InferenceClassification eq 'Focused'"
+        do{
+            $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+            foreach ($Message in $JSONOutput.Value) {
+                Write-Output $Message
+            }           
+            $RequestURL = $JSONOutput.'@odata.nextLink'
+        }while(![String]::IsNullOrEmpty($RequestURL))       
+
+    }
+}
+
+function Get-CalendarItems{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }   
+        $HttpClient =  Get-HTTPClient($MailboxName)
+        $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/events/?`$select=Start,End,Subject,Organizer`&`$Top=1000"
+        do{
+            $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+            foreach ($Message in $JSONOutput.Value) {
+                Write-Output $Message
+            }           
+            $RequestURL = $JSONOutput.'@odata.nextLink'
+        }while(![String]::IsNullOrEmpty($RequestURL))       
+
+    }
+}
+
+function Get-FolderItems{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken,
+        [Parameter(Position=2, Mandatory=$false)] [string]$FolderPath,
+        [Parameter(Position=2, Mandatory=$false)] [PSCustomObject]$Folder
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }  
+        if($FolderPath -ne $null)
+        {
+            $Folder = Get-FolderFromPath -FolderPath $FolderPath -AccessToken $AccessToken -MailboxName $MailboxName         
+        }        
+        if($Folder -ne $null)
+        {
+            $HttpClient =  Get-HTTPClient($MailboxName)
+            $RequestURL =  $Folder.'@odata.id' + "/messages/?`$select=ReceivedDateTime,Sender,Subject,IsRead`&`$Top=1000"
+            do{
+                $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+                foreach ($Message in $JSONOutput.Value) {
+                    Write-Output $Message
+                }           
+                $RequestURL = $JSONOutput.'@odata.nextLink'
+            }while(![String]::IsNullOrEmpty($RequestURL))     
+       } 
+   
+
+    }
+}
+
+
+
+function Get-AllMailboxItems{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }  
+            $HttpClient =  Get-HTTPClient($MailboxName)
+            $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/MailFolders/AllItems/messages/?`$select=ReceivedDateTime,Sender,Subject,IsRead,ParentFolderId`&`$Top=1000"
+            do{
+                $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+                foreach ($Message in $JSONOutput.Value) {
+                    Write-Output $Message
+                }           
+                $RequestURL = $JSONOutput.'@odata.nextLink'
+            }while(![String]::IsNullOrEmpty($RequestURL))     
+   
+
+    }
+}
+
+function Get-AllMailFolders{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }  
+            $HttpClient =  Get-HTTPClient($MailboxName)
+            $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/MailFolders/msgfolderroot/childfolders/?`$Top=1000"
+            do{
+                $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+                foreach ($Folder in $JSONOutput.Value) {
+                    $Folder | Add-Member -NotePropertyName FolderPath -NotePropertyValue ("\\" + $Folder.DisplayName)
+                    Write-Output $Folder
+                    if($Folder.ChildFolderCount -gt 0)
+                    {
+                        Get-AllChildFolders -Folder $Folder -AccessToken $AccessToken                        
+                    }
+                }           
+                $RequestURL = $JSONOutput.'@odata.nextLink'
+            }while(![String]::IsNullOrEmpty($RequestURL))     
+   
+
+    }
+}
+function Get-AllChildFolders{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [PSCustomObject]$Folder,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }  
+            $HttpClient =  Get-HTTPClient($MailboxName)
+            $RequestURL =   $Folder.'@odata.id' + "/childfolders/?`$Top=1000"
+            do{
+                $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+                foreach ($ChildFolder in $JSONOutput.Value) {
+                    $ChildFolder | Add-Member -NotePropertyName FolderPath -NotePropertyValue ($Folder.FolderPath + "\" + $ChildFolder.DisplayName)
+                    Write-Output $ChildFolder
+                    if($ChildFolder.ChildFolderCount -gt 0)
+                    {
+                        Get-AllChildFolders -Folder $ChildFolder -AccessToken $AccessToken                        
+                    }
+                }           
+                $RequestURL = $JSONOutput.'@odata.nextLink'
+            }while(![String]::IsNullOrEmpty($RequestURL))     
+   
+
+    }
+}
+
+function Get-AllCalendarFolders{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }  
+            $HttpClient =  Get-HTTPClient($MailboxName)
+            $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/Calendars/?`$Top=1000"
+            do{
+                $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+                foreach ($Folder in $JSONOutput.Value) {
+                    Write-Output $Folder
+                }           
+                $RequestURL = $JSONOutput.'@odata.nextLink'
+            }while(![String]::IsNullOrEmpty($RequestURL))     
+   
+
+    }
+}
+function Get-AllContactFolders{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }  
+            $HttpClient =  Get-HTTPClient($MailboxName)
+            $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/contactfolders/?`$Top=1000"
+            do{
+                $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+                foreach ($Folder in $JSONOutput.Value) {
+                    Write-Output $Folder
+                }           
+                $RequestURL = $JSONOutput.'@odata.nextLink'
+            }while(![String]::IsNullOrEmpty($RequestURL))     
+   
+
+    }
+}
+function Get-AllTaskfolders{
+    param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken
+    )
+    Begin{
+        if($AccessToken -eq $null)
+        {
+              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
+        }  
+            $HttpClient =  Get-HTTPClient($MailboxName)
+            $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/taskfolders/?`$Top=1000"
+            do{
+                $JSONOutput = Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+                foreach ($Folder in $JSONOutput.Value) {
+                    Write-Output $Folder
+                }           
+                $RequestURL = $JSONOutput.'@odata.nextLink'
+            }while(![String]::IsNullOrEmpty($RequestURL))     
+   
+
+    }
+}
+
+
+
 function Get-ArchiveFolder{
     param( 
         [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
@@ -446,22 +689,6 @@ function Get-ArchiveFolder{
     }
 }
 
-function Invoke-EnumerateFolderItems{
-    param( 
-        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
-        [Parameter(Position=1, Mandatory=$false)] [PSCustomObject]$AccessToken,
-        [Parameter(Position=2, Mandatory=$false)] [string]$FolderId
-    )
-    Begin{
-        if($AccessToken -eq $null)
-        {
-              $AccessToken = Get-AccessToken -MailboxName $MailboxName          
-        }   
-        $HttpClient =  Get-HTTPClient($MailboxName)
-        $RequestURL =  "https://outlook.office.com/api/v2.0/Users('$MailboxName')/MailFolders('$FolderId')/messages?&select=Subject,Sender,ReceivedDateTime`$top=5"
-        return Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
-    }
-}
 
 function Get-MailboxSettingsReport{
     param( 
@@ -563,6 +790,11 @@ function  Enum-CalendarGroups {
             Write-Host ("GroupName : " + $Group.Name) 
             $GroupId = $Group.Id.ToString()           
             $RequestURL =  "https://outlook.office.com/api/v2.0/users/" + $MailboxName + "/CalendarGroups('$GroupId')/Calendars"
+            $JsonObjectSub =  Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
+            foreach ($Calendar in $JsonObjectSub.Value) {
+                Write-Host $Calendar.Name
+            }
+            $RequestURL =  "https://outlook.office.com/api/v2.0/users/" + $MailboxName + "/CalendarGroups('$GroupId')/MailFolders"
             $JsonObjectSub =  Invoke-RestGet -RequestURL $RequestURL -HttpClient $HttpClient -AccessToken $AccessToken -MailboxName $MailboxName
             foreach ($Calendar in $JsonObjectSub.Value) {
                 Write-Host $Calendar.Name

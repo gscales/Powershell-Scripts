@@ -1,0 +1,11 @@
+﻿TOPIC
+	about_ExchangeContacts
+	
+SHORT DESCRIPTION
+	Explains how to use the ExchangeContacts powershell module
+	
+LONG DESCRIPTION
+	<Insert Content here>
+
+KEYWORDS
+	ExchangeContacts

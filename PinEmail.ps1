@@ -137,18 +137,23 @@ function Get-PinnedEmail  {
         }
         $PR_RenewTime = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0xF01,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::SystemTime); 
         $PR_RenewTime2 = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0xF02,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::SystemTime); 
-        $SfSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsGreaterThan($PR_RenewTime2, [DateTime]::Parse("4500-9-1"))
+        $SfSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsGreaterThanOrEqualTo($PR_RenewTime2, [DateTime]::Parse("4500-9-1"))
         $psPropset= new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
         $psPropset.Add($PR_RenewTime)  
         $psPropset.Add($PR_RenewTime2)  
         
         $Folder = Get-FolderFromPath -FolderPath $FolderPath -SmtpAddress $MailboxName -service $service
 		Write-Host ("Total Message Count : " + $Folder.TotalCount)
+        $rptcnt = $true
             $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000)  
             $ivItemView.PropertySet = $psPropset
             $fiItems = $null
             do{ 
                 $fiItems = $Folder.findItems($SfSearchFilter,$ivItemView)  
+                if($rptcnt){
+                    Write-Host ("Total Pinned Message Count : " + $fiItems.TotalCount)
+                    $rptcnt = $false
+                }
                 foreach($Item in $fiItems.Items){
                      Write-Output $Item
                 }
@@ -167,6 +172,20 @@ function Set-UnPinEmail  {
         $PR_RenewTime2 = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0xF02,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::SystemTime); 
         [void] $Item.RemoveExtendedProperty($PR_RenewTime)
         [void] $Item.RemoveExtendedProperty($PR_RenewTime2)
+        $Item.Update([Microsoft.Exchange.WebServices.Data.ConflictResolutionMode]::AlwaysOverwrite)
+    }
+}
+
+function Set-PinEmail  {
+	    param( 
+        [Parameter(Position=0, Mandatory=$true)] [Microsoft.Exchange.WebServices.Data.Item]$Item
+    )  
+ 	Process
+    {
+        $PR_RenewTime = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0xF01,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::SystemTime); 
+        $PR_RenewTime2 = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0xF02,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::SystemTime); 
+        [void] $Item.SetExtendedProperty($PR_RenewTime,[DateTime]::Parse("4500-9-1T00:00:00Z"))
+        [void] $Item.SetExtendedProperty($PR_RenewTime2,[DateTime]::Parse("4500-9-1T00:00:00Z"))
         $Item.Update([Microsoft.Exchange.WebServices.Data.ConflictResolutionMode]::AlwaysOverwrite)
     }
 }
@@ -209,4 +228,35 @@ function Get-FolderFromPath{
 			throw ("Folder Not found")
 		}
 	}
+}
+
+function Invoke-PinLastEmail  {
+	    param( 
+    	[Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+		[Parameter(Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
+		[Parameter(Position=2, Mandatory=$false)] [switch]$useImpersonation,
+		[Parameter(Position=3, Mandatory=$false)] [string]$url,
+        [Parameter(Position=4, Mandatory=$false)] [string]$FolderPath
+    )  
+ 	Process
+	{
+        if($url){
+			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url 
+		}
+		else{
+			$service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials
+		}
+		if($useImpersonation.IsPresent){
+			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName) 
+        }
+        
+        $Folder = Get-FolderFromPath -FolderPath $FolderPath -SmtpAddress $MailboxName -service $service
+		Write-Host ("Total Message Count : " + $Folder.TotalCount)
+        $rptcnt = $true
+        $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1)  
+        $fiItems = $Folder.findItems($ivItemView) 
+        Set-PinEmail -Item $fiItems.items[0]
+        Write-Host "Updated Message"
+
+    }
 }

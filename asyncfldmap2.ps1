@@ -154,8 +154,7 @@ function Get-AirSyncFolderMappings  {
                 }  
                 return $Val1Text  
             } 
-            
-            #Define Extended properties  
+             #Define Extended properties1  
             $PR_FOLDER_TYPE = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(13825,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Integer);  
             #Define the FolderView used for Export should not be any larger then 1000 folders due to throttling  
             $fvFolderView =  New-Object Microsoft.Exchange.WebServices.Data.FolderView(1000)  

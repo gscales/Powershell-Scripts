@@ -195,10 +195,11 @@ function Get-AirSyncFolderMappings  {
                                 $HexEntryId = [System.BitConverter]::ToString($collectVal).Replace("-","").Substring(2)
                                 $ewsFolderId = ConvertId -HexId ($HexEntryId.SubString(0,($HexEntryId.Length-2)))
                                 try{
-                                    $fldReport = "" | Select Mailbox,Device,AsFolderPath,MailboxFolderPath,LastModified,AirSyncLastSyncTime
+                                    $fldReport = "" | Select Mailbox,Device,AsFolderPath,MailboxFolderPath,MailboxItem,LastModified,AirSyncLastSyncTime
                                     $fldReport.Mailbox = $MailboxName
                                     $fldReport.Device = $ffFolder.DisplayName
                                     $fldReport.AsFolderPath = $asFolderPath
+                                    $fldReport.MailboxItem = $itItem.Subject
                                     $folderMapId= new-object Microsoft.Exchange.WebServices.Data.FolderId($ewsFolderId)   
                                     $MappedFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderMapId,$psPropertySet)
                                     $MappedFolderPath = (GetFolderPath -EWSFolder $MappedFolder)

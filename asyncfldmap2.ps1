@@ -210,7 +210,7 @@ function Get-AirSyncFolderMappings  {
                                     }
                                     $AirSyncLastSyncTimeValue = $null
                                     if($itItem.TryGetProperty($AirSyncLastSyncTime,[ref]$AirSyncLastSyncTimeValue)){
-                                        $fldReport.AirSyncLastSyncTime = $AirSyncLastSyncTimeValue
+                                        $fldReport.AirSyncLastSyncTime = [DateTime]::FromBinary($AirSyncLastSyncTimeValue)
                                     }
                                     Write-Output $fldReport
                                     #$AsFolderReport += $fldReport

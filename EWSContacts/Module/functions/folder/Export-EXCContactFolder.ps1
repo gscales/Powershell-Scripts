@@ -109,6 +109,7 @@
 									if($Recurse.IsPresent){
 										$expObj = "" | Select-Object FolderName,DisplayName, GivenName, Surname, Gender, Email1DisplayName, Email1Type, Email1EmailAddress, BusinessPhone, MobilePhone, HomePhone, BusinessStreet, BusinessCity, BusinessState, HomeStreet, HomeCity, HomeState
 										$expObj.FolderName = $Folder.DisplayName
+										$foldpathval = $null
 										if ($Folder.TryGetProperty($PR_Folder_Path,[ref] $foldpathval))  
 										{  
 

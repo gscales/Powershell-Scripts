@@ -117,8 +117,8 @@
 											$hexArr = $binarry | ForEach-Object { $_.ToString("X2") }  
 											$hexString = $hexArr -join ''  
 											$hexString = $hexString.Replace("FEFF", "5C00")  
+											$fpath = ConvertToString($hexString)
 											$expObj.FolderName = $fpath
-
 										}  
 									}
 									else{

@@ -84,6 +84,7 @@
 			{
 				$FolderCollection = @()
 				$FolderCollection += $ContactFolder
+				$PR_Folder_Path = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(26293, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::String);  
 				if($Recurse.IsPresent){
 					Write-Host Getting Children
 					$FolderCollection = Get-ChildFolders -ContactFolder $ContactFolder -FolderCollection $FolderCollection	
@@ -105,7 +106,23 @@
 							{
 								if ($Item -is [Microsoft.Exchange.WebServices.Data.Contact])
 								{
-									$expObj = "" | Select-Object DisplayName, GivenName, Surname, Gender, Email1DisplayName, Email1Type, Email1EmailAddress, BusinessPhone, MobilePhone, HomePhone, BusinessStreet, BusinessCity, BusinessState, HomeStreet, HomeCity, HomeState
+									if($Recurse.IsPresent){
+										$expObj = "" | Select-Object FolderName,DisplayName, GivenName, Surname, Gender, Email1DisplayName, Email1Type, Email1EmailAddress, BusinessPhone, MobilePhone, HomePhone, BusinessStreet, BusinessCity, BusinessState, HomeStreet, HomeCity, HomeState
+										$expObj.FolderName = $Folder.DisplayName
+										if ($ffFolder.TryGetProperty($PR_Folder_Path,[ref] $foldpathval))  
+										{  
+
+											$binarry = [Text.Encoding]::UTF8.GetBytes($foldpathval)  
+											$hexArr = $binarry | ForEach-Object { $_.ToString("X2") }  
+											$hexString = $hexArr -join ''  
+											$hexString = $hexString.Replace("FEFF", "5C00")  
+											$expObj.FolderName = $fpath
+
+										}  
+									}
+									else{
+										$expObj = "" | Select-Object DisplayName, GivenName, Surname, Gender, Email1DisplayName, Email1Type, Email1EmailAddress, BusinessPhone, MobilePhone, HomePhone, BusinessStreet, BusinessCity, BusinessState, HomeStreet, HomeCity, HomeState
+									}
 									$expObj.DisplayName = $Item.DisplayName
 									$expObj.GivenName = $Item.GivenName
 									$expObj.Surname = $Item.Surname

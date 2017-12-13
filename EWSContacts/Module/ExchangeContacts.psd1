@@ -103,10 +103,10 @@
 			# Tags = @()
 			
 			# A URL to the license for this module.
-			# LicenseUri = ''
+			# LicenseUri = 'https://github.com/gscales/Powershell-Scripts/tree/master/LICENSE.txt'
 			
 			# A URL to the main website for this project.
-			# ProjectUri = ''
+			# ProjectUri = 'https://github.com/gscales/Powershell-Scripts/tree/master/EWSContacts'
 			
 			# A URL to an icon representing this module.
 			# IconUri = ''

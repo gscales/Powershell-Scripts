@@ -32,12 +32,19 @@
 		[string]
 		$SmptAddress,
 		
-		[Parameter(Position = 2, Mandatory = $true)]
+		[Parameter(Position = 2, Mandatory = $false)]
 		[Microsoft.Exchange.WebServices.Data.ExchangeService]
-		$Service
+		$Service, 
+
+		[Parameter(Position = 2, Mandatory = $false)]
+		[String]
+		$MailboxName
 	)
 	process
 	{
+		if(![String]::IsNullOrEmpty($MailboxName)){
+			$service = Connect-EXCExchange -MailboxName $MailboxName -Credentials $Credentials
+		}
 		## Find and Bind to Folder based on Path  
 		#Define the path to search should be seperated with \  
 		#Bind to the MSGFolder Root  

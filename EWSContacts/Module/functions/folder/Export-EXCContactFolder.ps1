@@ -333,7 +333,7 @@
 		
 		switch ($OutputType)
 		{
-			"CSV" { Get-Contacts -ContactFolder $contactFolder | Export-Csv -NoTypeInformation -Path $FileName -encoding "unicode" }
+			"CSV" { Get-Contacts -ContactFolder $contactFolder | Export-Csv -NoTypeInformation -Path $FileName -encoding "UTF8"}
 			default { throw "Invalid output type: $OutputType" }
 		}
 	}

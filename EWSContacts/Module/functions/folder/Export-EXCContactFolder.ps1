@@ -61,9 +61,13 @@
 		[string]
 		$FileName,
 
-		[Parameter(Position = 3, Mandatory = $true)]
+		[Parameter(Position = 3, Mandatory = $false)]
 		[switch]
 		$Recurse,
+
+		[Parameter(Position = 3, Mandatory = $false)]
+		[switch]
+		$RecurseMailbox,
 		
 		[ValidateSet('CSV')]
 		[string]
@@ -87,7 +91,10 @@
 				$PR_Folder_Path = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(26293, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::String);  
 				if($Recurse.IsPresent){
 					Write-Host Getting Children
-					$FolderCollection = Get-ChildFolders -ContactFolder $ContactFolder -FolderCollection $FolderCollection	
+					$FolderCollection = Get-ChildFolders -ContactFolder $ContactFolder -FolderCollection $FolderCollection 
+				}
+				if($RecurseMailbox.IsPresent){
+				    $FolderCollection = Get-AllContactFolders -SMTPAddress $MailboxName -ContactFolder $ContactFolder 
 				}
 				foreach($Folder in $FolderCollection){
 					Write-Host ("Processing " + $Folder.DisplayName)
@@ -106,7 +113,7 @@
 							{
 								if ($Item -is [Microsoft.Exchange.WebServices.Data.Contact])
 								{
-									if($Recurse.IsPresent){
+									if($Recurse.IsPresent -bor $RecurseMailbox.IsPresent){
 										$expObj = "" | Select-Object FolderName,DisplayName, GivenName, Surname, Gender, Email1DisplayName, Email1Type, Email1EmailAddress, BusinessPhone, MobilePhone, HomePhone, BusinessStreet, BusinessCity, BusinessState, HomeStreet, HomeCity, HomeState
 										$expObj.FolderName = $Folder.DisplayName
 										$foldpathval = $null
@@ -246,7 +253,58 @@
 				return ,$FolderCollection
 			}
 		}
-
+		function Get-AllContactFolders{
+		    [CmdletBinding()]
+			param (		
+				[Parameter(Position = 1, Mandatory = $true)]
+				[String]
+				$SMTPAddress,	
+				[Parameter(Position = 2, Mandatory = $true)]
+				[Microsoft.Exchange.WebServices.Data.Folder]
+				$ContactFolder
+			)
+			Process{
+				$FolderCollection = @()
+				$folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::MsgFolderRoot, $SMTPAddress)
+				$RootFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($ContactFolder.Service, $folderid)
+				$fvFolderView =  New-Object Microsoft.Exchange.WebServices.Data.FolderView(1000)  
+				#Deep Transval will ensure all folders in the search path are returned  
+				$fvFolderView.Traversal = [Microsoft.Exchange.WebServices.Data.FolderTraversal]::Deep;  
+				$psPropertySet = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)  
+				$PR_Folder_Path = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(26293, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::String);  
+				$PR_ATTR_HIDDEN = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x10F4,  [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Boolean);
+				#Add Properties to the  Property Set  
+				$psPropertySet.Add($PR_Folder_Path);  
+				$psPropertySet.Add($PR_ATTR_HIDDEN)
+				$fvFolderView.PropertySet = $psPropertySet;  
+				$fiResult = $null  
+				#The Do loop will handle any paging that is required if there are more the 1000 folders in a mailbox  
+				do {  
+					$fiResult = $RootFolder.FindFolders($fvFolderView)  
+					foreach($ffFolder in $fiResult.Folders){  
+						if($ffFolder.FolderClass -contains "IPF.Contact"){
+							$BoolIsHidden = $false
+							[Void]$ffFolder.TryGetProperty($PR_ATTR_HIDDEN,[ref]$BoolIsHidden)
+							if(!$BoolIsHidden){
+								$foldpathval = $null  
+								#Try to get the FolderPath Value and then covert it to a usable String   
+								if ($ffFolder.TryGetProperty($PR_Folder_Path,[ref] $foldpathval))  
+								{  
+									$binarry = [Text.Encoding]::UTF8.GetBytes($foldpathval)  
+									$hexArr = $binarry | ForEach-Object { $_.ToString("X2") }  
+									$hexString = $hexArr -join ''  
+									$hexString = $hexString.Replace("FEFF", "5C00")  
+									$fpath = ConvertToString($hexString)  
+								}  			
+								$FolderCollection += $ffFolder
+							}
+						}
+					} 
+					$fvFolderView.Offset += $fiResult.Folders.Count
+				}while($fiResult.MoreAvailable -eq $true)  
+				return ,$FolderCollection
+			}
+		}
 		# Connect
 		$service = Connect-EXCExchange -MailboxName $MailboxName -Credentials $Credentials
 	}
@@ -275,8 +333,9 @@
 		
 		switch ($OutputType)
 		{
-			"CSV" { Get-Contacts -ContactFolder $contactFolder | Export-Csv -NoTypeInformation -Path $FileName }
+			"CSV" { Get-Contacts -ContactFolder $contactFolder | Export-Csv -NoTypeInformation -Path $FileName -encoding "unicode" }
 			default { throw "Invalid output type: $OutputType" }
 		}
 	}
 }
+

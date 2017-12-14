@@ -40,12 +40,15 @@
 		
 		[Parameter(Position = 3, Mandatory = $false)]
 		[switch]
-		$useImpersonation
+		$useImpersonation,
+
+		[Parameter(Position = 4, Mandatory = $true)][String]$CrediCardValdatorDLLPath
+
 	)
 	Begin
 	{
 		$Script:rptCollection = @()
-		
+		import-module path $CrediCardValdatorDLLPath
 		#Connect
 		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials
 		if ($useImpersonation.IsPresent)

@@ -4,7 +4,7 @@
 	ModuleToProcess = 'ExchangeContacts.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.0.0.0'
+	ModuleVersion = '1.1.0.0'
 	
 	# ID used to uniquely identify this module
 	GUID = '6901af86-a39e-4a4c-afa6-b8ead127c674'
@@ -44,7 +44,7 @@
 	RequiredModules = @()
 	
 	# Assemblies that must be loaded prior to importing this module
-	RequiredAssemblies = @("bin\CreditCardValidator.dll")
+	RequiredAssemblies = @()
 	
 	# Script files (.ps1) that are run in the caller's environment prior to
 	# importing this module

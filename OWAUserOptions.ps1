@@ -130,7 +130,7 @@ function Get-OWAUserOptions{
         }
          $service.HttpHeaders.Add("X-AnchorMailbox", $MailboxName);  
         $folderid= new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Root,$MailboxName)     
-        #Specify the Root folder where the FAI Item is      
+        #Specify the Root folder for the FAI Item      
         $UsrConfig = [Microsoft.Exchange.WebServices.Data.UserConfiguration]::Bind($service, "OWA.UserOptions", $folderid, [Microsoft.Exchange.WebServices.Data.UserConfigurationProperties]::All)  
         return $UsrConfig.Dictionary
     }

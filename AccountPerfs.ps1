@@ -116,7 +116,7 @@ function Handle-SSL {
     }
 }
 
-function Get-AccountPrefs{ 
+function Get-AccountPrefs { 
     param( 
         [Parameter(Position = 0, Mandatory = $true)] [string]$MailboxName,
         [Parameter(Position = 1, Mandatory = $true)] [System.Management.Automation.PSCredential]$Credentials,
@@ -128,11 +128,23 @@ function Get-AccountPrefs{
         if ($useImpersonation.IsPresent) {
             $service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)        
         }
-         $service.HttpHeaders.Add("X-AnchorMailbox", $MailboxName);  
-        $folderid= new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox,$MailboxName)     
-        #Specify the Root folder for the FAI Item      
-        $UsrConfig = [Microsoft.Exchange.WebServices.Data.UserConfiguration]::Bind($service, "AccountPrefs", $folderid, [Microsoft.Exchange.WebServices.Data.UserConfigurationProperties]::All)  
-        return $UsrConfig.Dictionary
+        $service.HttpHeaders.Add("X-AnchorMailbox", $MailboxName);  
+        $folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $MailboxName)    
+        #Check to see if it exists and display a better error if it doesn't
+        $sfFolderSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsEqualTo([Microsoft.Exchange.WebServices.Data.ItemSchema]::ItemClass, "IPM.Configuration.AccountPrefs") 
+        $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1) 
+        $ivItemView.Traversal = [Microsoft.Exchange.WebServices.Data.ItemTraversal]::Associated
+        $fiItems = $service.FindItems($folderid, $sfFolderSearchFilter, $ivItemView) 
+        if ($fiItems.Items.Count -eq 1) {
+            $UsrConfig = [Microsoft.Exchange.WebServices.Data.UserConfiguration]::Bind($service, "AccountPrefs", $folderid, [Microsoft.Exchange.WebServices.Data.UserConfigurationProperties]::All)  
+            return $UsrConfig.Dictionary
+        }
+        else {
+            write-host ("No AccountPrefs Object in Mailbox")	
+            return $null		
+        }
+        
+
     }
 }
 

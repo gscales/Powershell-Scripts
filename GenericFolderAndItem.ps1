@@ -117,51 +117,7 @@ function Handle-SSL {
 }
 
 
-function Invoke-GenericFolderItemEnum {
-    param( 
-        [Parameter(Position = 0, Mandatory = $true)] [Microsoft.Exchange.WebServices.Data.Folder]$Folder,
-        [Parameter(Position = 1, Mandatory = $false)] [switch]$FullDetails
-    )  
-    Process {
-     
-        $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000) 
-        $ItemPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
-        $ItemPropsetIdOnly = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::IdOnly)
-        if ($FullDetails.IsPresent) {
-            $ivItemView.PropertySet = $ItemPropsetIdOnly
-            $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(100) 
-        }
-        else {
-            $ivItemView.PropertySet = $ItemPropset
-        }            
-        $fiItems = $null    
-        do { 
-            $error.clear()
-            try {
-                $fiItems = $Folder.service.FindItems($Folder.Id, $ivItemView) 
-            }
-            catch {
-                write-host ("Error " + $_.Exception.Message)
-                if ($_.Exception -is [Microsoft.Exchange.WebServices.Data.ServiceResponseException]) {
-                    Write-Host ("EWS Error : " + ($_.Exception.ErrorCode))
-                    Start-Sleep -Seconds 60 
-                }	
-                $fiItems = $Folder.service.FindItems($Folder.Id, $ivItemView) 
-            }
-            if ($FullDetails.IsPresent) {
-                if ($fiItems.Items.Count -gt 0) {
-                    [Void]$Folder.service.LoadPropertiesForItems($fiItems, $ItemPropset)  
-                }
-            }			  
-            Write-Host ("Processed " + $fiItems.Items.Count + " : " + $ItemClass)
-            foreach ($Item in $fiItems.Items) { 
-                $Item | Add-Member -Name "FolderPath" -Value $Folder.FolderPath -MemberType NoteProperty
-                Write-Output $Item
-            }    
-            $ivItemView.Offset += $fiItems.Items.Count    
-        }while ($fiItems.MoreAvailable -eq $true) 
-    }
-}
+
 
 function Invoke-GenericFolderItemEnum {
     param( 
@@ -171,13 +127,107 @@ function Invoke-GenericFolderItemEnum {
         [Parameter(Position = 3, Mandatory = $false)] [switch]$useImpersonation,
         [Parameter(Position = 4, Mandatory = $true)] [string]$FolderPath,
         [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse,
-        [Parameter(Position = 1, Mandatory = $false)] [switch]$FullDetails
+        [Parameter(Position = 6, Mandatory = $false)] [switch]$FullDetails,
+        [Parameter(Position = 7, Mandatory = $false)] [Int]$MaxCount 
     )  
     Process {
-          
         $folders = Invoke-GenericFolderConnect -MailboxName $MailboxName -Credentials $Credentials -url $url -useImpersonation:$useImpersonation.IsPresent -FolderPath $FolderPath -Recurse:$Recurse.IsPresent
         foreach ($Folder in $folders) {
-            Invoke-GenericFolderItemEnum -Folder $Folder -FullDetails:$FullDetails.IsPresent
+                if($MaxCount -gt 0){
+                    $Script:MaxCount = $MaxCount
+                    $Script:UseMaxCount = $true
+                    $Script:MaxCountExceeded = $false
+                }
+                else{
+                    $Script:MaxCount = 0
+                    $Script:UseMaxCount = $false
+                    $Script:MaxCountExceeded = $false
+                }
+                if($Script:UseMaxCount){
+                    if($Script:MaxCount -gt 1000){
+                        $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000)
+                    }
+                    else{
+                        $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView($Script:MaxCount)
+                    }
+                }else{
+                    $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000)
+                }                
+                $ItemPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
+                $ItemPropsetIdOnly = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::IdOnly)
+                if ($FullDetails.IsPresent) {
+                    $ivItemView.PropertySet = $ItemPropsetIdOnly
+                    if($Script:UseMaxCount){
+                        if($Script:MaxCount -gt 100){
+                            $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(100)
+                        }
+                        else{
+                             $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView($Script:MaxCount)
+                        }
+                    }else{
+                         $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(100)
+                    }                     
+                }
+                else {
+                    $ivItemView.PropertySet = $ItemPropset
+                }
+                $itemCount = 0            
+                $fiItems = $null    
+                do { 
+                    $error.clear()
+                    try {
+                        $fiItems = $Folder.service.FindItems($Folder.Id, $ivItemView) 
+                    }
+                    catch {
+                        write-host ("Error " + $_.Exception.Message)
+                        if ($_.Exception -is [Microsoft.Exchange.WebServices.Data.ServiceResponseException]) {
+                            Write-Host ("EWS Error : " + ($_.Exception.ErrorCode))
+                            Start-Sleep -Seconds 60 
+                        }	
+                        $fiItems = $Folder.service.FindItems($Folder.Id, $ivItemView) 
+                    }
+                    if ($FullDetails.IsPresent) {
+                        if ($fiItems.Items.Count -gt 0) {
+                            [Void]$Folder.service.LoadPropertiesForItems($fiItems, $ItemPropset)  
+                        }
+                    }	
+                    if($fiItems.Items.Count -gt 0){
+                        Write-Host ("Processed " + $fiItems.Items.Count + " : " + $ItemClass)
+                    }	  
+                    
+                    foreach ($Item in $fiItems.Items) { 
+                        $itemCount ++
+                        $Okay = $true;
+                        if($Script:UseMaxCount){
+                            if($itemCount -gt $Script:MaxCount){
+                                $okay = $False                               
+                            }
+                        }
+                        if($Okay){
+                            $DownloadAttachments = {
+                                param([Parameter(Position = 0, Mandatory = $true)] [string]$FolderPath)
+                                $this.Load()
+                                foreach($attach in $this.Attachments){
+                                    $attach.Load()
+                                    $fiFile = new-object System.IO.FileStream(($FolderPath + "\" + $attach.Name.ToString()), [System.IO.FileMode]::Create)
+                                    $fiFile.Write($attach.Content, 0, $attach.Content.Length)
+                                    $fiFile.Close()
+                                    write-host ("Downloaded Attachment : " + (($FolderPath + "\" + $attach.Name.ToString())))
+                                }
+                            }
+                            Add-Member -InputObject $Item -MemberType ScriptMethod -Name DownloadAttachments -Value $DownloadAttachments 
+                            $Item | Add-Member -Name "FolderPath" -Value $Folder.FolderPath -MemberType NoteProperty
+                            Write-Output $Item
+                        }
+                         
+                    }   
+                    if($Script:UseMaxCount){
+                        if($itemCount -ge $Script:MaxCount){
+                            $Script:MaxCountExceeded = $true
+                        } 
+                    }
+                    $ivItemView.Offset += $fiItems.Items.Count    
+                }while ($fiItems.MoreAvailable -eq $true -band (!$Script:MaxCountExceeded)) 
         }
     }
 }
@@ -187,8 +237,9 @@ function Invoke-GenericFolderConnect {
         [Parameter(Position = 1, Mandatory = $true)] [System.Management.Automation.PSCredential]$Credentials,
         [Parameter(Position = 2, Mandatory = $false)] [string]$url,
         [Parameter(Position = 3, Mandatory = $false)] [switch]$useImpersonation,
-        [Parameter(Position = 4, Mandatory = $true)] [string]$FolderPath,
-        [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse
+        [Parameter(Position = 4, Mandatory = $false)] [string]$FolderPath,
+        [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse,
+        [Parameter(Position = 6, Mandatory = $false)] [switch]$RootFolder
     )  
     Process {
         $service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url
@@ -197,7 +248,7 @@ function Invoke-GenericFolderConnect {
         }
         $service.HttpHeaders.Add("X-AnchorMailbox", $MailboxName);  
        
-        $folders = Get-FolderFromPath -MailboxName $MailboxName -FolderPath $FolderPath -service $service -Recurse:$Recurse.IsPresent
+        $folders = Get-FolderFromPath -MailboxName $MailboxName -FolderPath $FolderPath -service $service -Recurse:$Recurse.IsPresent -RootFolder:$RootFolder.IsPresent
         return $folders 
     }
 }
@@ -212,11 +263,12 @@ function ConvertToString($ipInputString) {
 } 
 function Get-FolderFromPath {
     param (
-        [Parameter(Position = 0, Mandatory = $true)] [string]$FolderPath,
+        [Parameter(Position = 0, Mandatory = $false)] [string]$FolderPath,
         [Parameter(Position = 1, Mandatory = $true)] [string]$MailboxName,
         [Parameter(Position = 2, Mandatory = $true)] [Microsoft.Exchange.WebServices.Data.ExchangeService]$service,
         [Parameter(Position = 3, Mandatory = $false)] [Microsoft.Exchange.WebServices.Data.PropertySet]$PropertySet,
-        [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse
+        [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse,
+        [Parameter(Position = 6, Mandatory = $false)] [switch]$RootFolder
 		  )
     process {
         ## Find and Bind to Folder based on Path  
@@ -232,35 +284,42 @@ function Get-FolderFromPath {
        	#PR_RETENTION_PERIOD 0x301A
        	$RetentionPeriod = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x301A, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Integer);
         $PidTagMessageSizeExtended = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0xe08, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Long);
+        $PR_ATTACH_ON_NORMAL_MSG_COUNT = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x66B1, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Integer);
         $psPropset.Add($PolicyTag)
         $psPropset.Add($RetentionFlags)
         $psPropset.Add($RetentionPeriod)
         $psPropset.Add($PidTagMessageSizeExtended)
+        $psPropset.Add($PR_ATTACH_ON_NORMAL_MSG_COUNT)
 
         $folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::MsgFolderRoot, $MailboxName)   
         $tfTargetFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $folderid)  
-        #Split the Search path into an array  
-        $fldArray = $FolderPath.Split("\") 
-        if ($fldArray.Length -lt 2) {throw "No Root Folder"}
-        #Loop through the Split Array and do a Search for each level of folder 
-        for ($lint = 1; $lint -lt $fldArray.Length; $lint++) { 
-            #Perform search based on the displayname of each folder level 
-            $fvFolderView = new-object Microsoft.Exchange.WebServices.Data.FolderView(1) 
-            $fvFolderView.PropertySet = $psPropset
-            $SfSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsEqualTo([Microsoft.Exchange.WebServices.Data.FolderSchema]::DisplayName, $fldArray[$lint]) 
-            $findFolderResults = $service.FindFolders($tfTargetFolder.Id, $SfSearchFilter, $fvFolderView) 
-            $tfTargetFolder = $null  
-            if ($findFolderResults.TotalCount -gt 0) { 
-                foreach ($folder in $findFolderResults.Folders) { 
-                    $tfTargetFolder = $folder                
-                } 
-            } 
-            else { 
-                Write-host ("Error Folder Not Found check path and try again") -ForegroundColor Red
+        if(!$RootFolder.IsPresent){
+            #Split the Search path into an array  
+            $fldArray = $FolderPath.Split("\") 
+            if ($fldArray.Length -lt 2) {throw "No Root Folder"}
+            #Loop through the Split Array and do a Search for each level of folder 
+            for ($lint = 1; $lint -lt $fldArray.Length; $lint++) { 
+                #Perform search based on the displayname of each folder level 
+                $fvFolderView = new-object Microsoft.Exchange.WebServices.Data.FolderView(1) 
+                $fvFolderView.PropertySet = $psPropset
+                $SfSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsEqualTo([Microsoft.Exchange.WebServices.Data.FolderSchema]::DisplayName, $fldArray[$lint]) 
+                $findFolderResults = $service.FindFolders($tfTargetFolder.Id, $SfSearchFilter, $fvFolderView) 
                 $tfTargetFolder = $null  
-                break  
-            }     
-        }  
+                if ($findFolderResults.TotalCount -gt 0) { 
+                    foreach ($folder in $findFolderResults.Folders) { 
+                        $tfTargetFolder = $folder                
+                    } 
+                } 
+                else { 
+                    Write-host ("Error Folder Not Found check path and try again") -ForegroundColor Red
+                    $tfTargetFolder = $null  
+                    break  
+                }     
+            }  
+        }
+        else{
+            $FolderPath = "\"
+        }
         if ($tfTargetFolder -ne $null) {
             $tfTargetFolder | Add-Member -Name "FolderPath" -Value $FolderPath -MemberType NoteProperty
             $tfTargetFolder | Add-Member -Name "Mailbox" -Value $MailboxName -MemberType NoteProperty
@@ -282,6 +341,21 @@ function Get-FolderFromPath {
             if ($tfTargetFolder.TryGetProperty($PidTagMessageSizeExtended, [ref]  $prop4Val)) {
                 Add-Member -InputObject $tfTargetFolder -MemberType NoteProperty -Name FolderSize -Value $prop4Val
             }
+            $prop5Val = $null
+            if ($tfTargetFolder.TryGetProperty($PR_ATTACH_ON_NORMAL_MSG_COUNT, [ref]  $prop5Val)) {
+                Add-Member -InputObject $tfTargetFolder -MemberType NoteProperty -Name PR_ATTACH_ON_NORMAL_MSG_COUNT -Value $prop5Val
+            }
+            $GetLastItem = {
+                $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1) 
+                $fiItems =  $this.FindItems($ivItemView)
+                if($fiItems.Items.Count -eq 1){
+                    $fiItems.Items[0].Load()
+                    $fiItems.Items[0] | Add-Member -Name "FolderPath" -Value $this.FolderPath -MemberType NoteProperty
+                    Add-Member -InputObject $this -MemberType NoteProperty -Name LastItem -Value $fiItems.Items[0] -Force
+                    return $fiItems.Items[0]
+                }                
+            }
+            Add-Member -InputObject $tfTargetFolder -MemberType ScriptMethod -Name GetLastItem -Value $GetLastItem
             if ($Recurse.IsPresent) {
                 $Folders = @()
                 $Folders += $tfTargetFolder
@@ -316,12 +390,13 @@ function Get-SubFolders {
             $RetentionPeriod = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x301A, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Integer);
             $SourceKey = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x65E0, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Binary);
             $PidTagMessageSizeExtended = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0xe08, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Long);
-
+            $PR_ATTACH_ON_NORMAL_MSG_COUNT = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x66B1, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Integer);
             $PropertySet.Add($PR_POLICY_TAG)
             $PropertySet.Add($RetentionFlags)
             $PropertySet.Add($RetentionPeriod)
             $PropertySet.Add($SourceKey)
             $PropertySet.Add($PidTagMessageSizeExtended)
+            $PropertySet.Add($PR_ATTACH_ON_NORMAL_MSG_COUNT)
         }	
 		
         #Define Extended properties  
@@ -372,10 +447,29 @@ function Get-SubFolders {
                 if ($ffFolder.TryGetProperty($PidTagMessageSizeExtended, [ref]  $prop4Val)) {
                     Add-Member -InputObject $ffFolder -MemberType NoteProperty -Name FolderSize -Value $prop4Val
                 }
-                $Folders += $ffFolder
-            } 
+                $prop5Val = $null
+                if ($ffFolder.TryGetProperty($PR_ATTACH_ON_NORMAL_MSG_COUNT, [ref]  $prop5Val)) {
+                    Add-Member -InputObject $ffFolder -MemberType NoteProperty -Name PR_ATTACH_ON_NORMAL_MSG_COUNT -Value $prop5Val
+                }
+                $GetLastItem = {
+                    $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1) 
+                    $fiItems =  $this.FindItems($ivItemView)
+                    if($fiItems.Items.Count -eq 1){
+                        $fiItems.Items[0].Load()
+                        $fiItems.Items[0] | Add-Member -Name "FolderPath" -Value $this.FolderPath -MemberType NoteProperty
+                        Add-Member -InputObject $this -MemberType NoteProperty -Name LastItem -Value $fiItems.Items[0] -Force
+                        return $fiItems.Items[0]
+                    }                
+                }
+                Add-Member -InputObject $ffFolder -MemberType ScriptMethod -Name GetLastItem -Value $GetLastItem
+                    $Folders += $ffFolder
+                } 
             $fvFolderView.Offset += $fiResult.Folders.Count
         }while ($fiResult.MoreAvailable -eq $true)  
         return, $Folders	
     }
 }
+
+$Script:MaxCount = 0
+$Script:UseMaxCount = $false
+$Script:MaxCountExceeded = $false

@@ -117,51 +117,53 @@ function Handle-SSL {
 }
 
 
-function Invoke-GenericFolderItemEnum{
+function Invoke-GenericFolderItemEnum {
     param( 
         [Parameter(Position = 0, Mandatory = $true)] [Microsoft.Exchange.WebServices.Data.Folder]$Folder,
         [Parameter(Position = 1, Mandatory = $false)] [switch]$FullDetails
     )  
-   Process {
+    Process {
      
-            $ivItemView =  New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000) 
-            $ItemPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
-            $ItemPropsetIdOnly = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::IdOnly)
-            if($FullDetails.IsPresent){
-                $ivItemView.PropertySet =$ItemPropsetIdOnly
-                $ivItemView =  New-Object Microsoft.Exchange.WebServices.Data.ItemView(100) 
-            }else{
-                $ivItemView.PropertySet = $ItemPropset
-            }            
-            $fiItems = $null    
-			do{ 
-                $error.clear()
-                try{
-                    $fiItems = $Folder.service.FindItems($Folder.Id,$ivItemView) 
-                }catch{
-                    write-host ("Error " + $_.Exception.Message)
-                    if($_.Exception -is [Microsoft.Exchange.WebServices.Data.ServiceResponseException]){
-                        Write-Host ("EWS Error : " + ($_.Exception.ErrorCode))
-                         Start-Sleep -Seconds 60 
-                    }	
-                    $fiItems = $Folder.service.FindItems($Folder.Id,$ivItemView) 
+        $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000) 
+        $ItemPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
+        $ItemPropsetIdOnly = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::IdOnly)
+        if ($FullDetails.IsPresent) {
+            $ivItemView.PropertySet = $ItemPropsetIdOnly
+            $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(100) 
+        }
+        else {
+            $ivItemView.PropertySet = $ItemPropset
+        }            
+        $fiItems = $null    
+        do { 
+            $error.clear()
+            try {
+                $fiItems = $Folder.service.FindItems($Folder.Id, $ivItemView) 
+            }
+            catch {
+                write-host ("Error " + $_.Exception.Message)
+                if ($_.Exception -is [Microsoft.Exchange.WebServices.Data.ServiceResponseException]) {
+                    Write-Host ("EWS Error : " + ($_.Exception.ErrorCode))
+                    Start-Sleep -Seconds 60 
+                }	
+                $fiItems = $Folder.service.FindItems($Folder.Id, $ivItemView) 
+            }
+            if ($FullDetails.IsPresent) {
+                if ($fiItems.Items.Count -gt 0) {
+                    [Void]$Folder.service.LoadPropertiesForItems($fiItems, $ItemPropset)  
                 }
-                if($FullDetails.IsPresent){
-                    if($fiItems.Items.Count -gt 0){
-                        [Void]$Folder.service.LoadPropertiesForItems($fiItems,$ItemPropset)  
-                    }
-                }			  
-				Write-Host ("Processed " + $fiItems.Items.Count + " : " + $ItemClass)
-				foreach($Item in $fiItems.Items){ 
-                    $Item | Add-Member -Name "FolderPath" -Value $Folder.FolderPath -MemberType NoteProperty
-                    Write-Output $Item
-				}    
-				$ivItemView.Offset += $fiItems.Items.Count    
-            }while($fiItems.MoreAvailable -eq $true) 
+            }			  
+            Write-Host ("Processed " + $fiItems.Items.Count + " : " + $ItemClass)
+            foreach ($Item in $fiItems.Items) { 
+                $Item | Add-Member -Name "FolderPath" -Value $Folder.FolderPath -MemberType NoteProperty
+                Write-Output $Item
+            }    
+            $ivItemView.Offset += $fiItems.Items.Count    
+        }while ($fiItems.MoreAvailable -eq $true) 
     }
 }
 
-function Invoke-GenericFolderItemEnum{
+function Invoke-GenericFolderItemEnum {
     param( 
         [Parameter(Position = 0, Mandatory = $true)] [string]$MailboxName,
         [Parameter(Position = 1, Mandatory = $true)] [System.Management.Automation.PSCredential]$Credentials,
@@ -171,16 +173,16 @@ function Invoke-GenericFolderItemEnum{
         [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse,
         [Parameter(Position = 1, Mandatory = $false)] [switch]$FullDetails
     )  
-   Process {
+    Process {
           
-            $folders = Invoke-GenericFolderConnect -MailboxName $MailboxName -Credentials $Credentials -url $url -useImpersonation:$useImpersonation.IsPresent -FolderPath $FolderPath -Recurse:$Recurse.IsPresent
-            foreach($Folder in $folders){
-                Invoke-GenericFolderItemEnum -Folder $Folder -FullDetails:$FullDetails.IsPresent
-            }
+        $folders = Invoke-GenericFolderConnect -MailboxName $MailboxName -Credentials $Credentials -url $url -useImpersonation:$useImpersonation.IsPresent -FolderPath $FolderPath -Recurse:$Recurse.IsPresent
+        foreach ($Folder in $folders) {
+            Invoke-GenericFolderItemEnum -Folder $Folder -FullDetails:$FullDetails.IsPresent
+        }
     }
 }
-function Invoke-GenericFolderConnect{
-        param( 
+function Invoke-GenericFolderConnect {
+    param( 
         [Parameter(Position = 0, Mandatory = $true)] [string]$MailboxName,
         [Parameter(Position = 1, Mandatory = $true)] [System.Management.Automation.PSCredential]$Credentials,
         [Parameter(Position = 2, Mandatory = $false)] [string]$url,
@@ -188,7 +190,7 @@ function Invoke-GenericFolderConnect{
         [Parameter(Position = 4, Mandatory = $true)] [string]$FolderPath,
         [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse
     )  
-   Process {
+    Process {
         $service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url
         if ($useImpersonation.IsPresent) {
             $service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)        
@@ -239,7 +241,7 @@ function Get-FolderFromPath {
         $tfTargetFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $folderid)  
         #Split the Search path into an array  
         $fldArray = $FolderPath.Split("\") 
-        if($fldArray.Length -lt 2){throw "No Root Folder"}
+        if ($fldArray.Length -lt 2) {throw "No Root Folder"}
         #Loop through the Split Array and do a Search for each level of folder 
         for ($lint = 1; $lint -lt $fldArray.Length; $lint++) { 
             #Perform search based on the displayname of each folder level 
@@ -280,13 +282,13 @@ function Get-FolderFromPath {
             if ($tfTargetFolder.TryGetProperty($PidTagMessageSizeExtended, [ref]  $prop4Val)) {
                 Add-Member -InputObject $tfTargetFolder -MemberType NoteProperty -Name FolderSize -Value $prop4Val
             }
-            if($Recurse.IsPresent){
+            if ($Recurse.IsPresent) {
                 $Folders = @()
                 $Folders += $tfTargetFolder
                 $Folders = Get-SubFolders -ParentFolder $tfTargetFolder -Folders $Folders
                 return, [PSObject]$Folders
             }
-            else{
+            else {
                 return, [Microsoft.Exchange.WebServices.Data.Folder]$tfTargetFolder
             }
            
@@ -366,7 +368,7 @@ function Get-SubFolders {
                 if ($ffFolder.TryGetProperty($RetentionPeriod, [ref] $prop3Val)) {
                     Add-Member -InputObject $ffFolder -MemberType NoteProperty -Name PR_RETENTION_PERIOD -Value $prop3Val
                 }
-                 $prop4Val = $null
+                $prop4Val = $null
                 if ($ffFolder.TryGetProperty($PidTagMessageSizeExtended, [ref]  $prop4Val)) {
                     Add-Member -InputObject $ffFolder -MemberType NoteProperty -Name FolderSize -Value $prop4Val
                 }

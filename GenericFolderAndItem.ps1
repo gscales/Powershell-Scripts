@@ -128,6 +128,7 @@ function Invoke-GenericFolderItemEnum {
         [Parameter(Position = 4, Mandatory = $true)] [string]$FolderPath,
         [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse,
         [Parameter(Position = 6, Mandatory = $false)] [switch]$FullDetails,
+        [Parameter(Position = 6, Mandatory = $false)] [switch]$ReturnSentiment,
         [Parameter(Position = 7, Mandatory = $false)] [Int]$MaxCount 
     )  
     Process {
@@ -154,6 +155,10 @@ function Invoke-GenericFolderItemEnum {
                     $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000)
                 }                
                 $ItemPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
+                if($ReturnSentiment.IsPresent){
+                    $Sentiment = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition([Microsoft.Exchange.WebServices.Data.DefaultExtendedPropertySet]::Common,"EntityExtraction/Sentiment1.0", [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::String);
+                    $ItemPropset.Add($Sentiment)
+                }
                 $ItemPropsetIdOnly = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::IdOnly)
                 if ($FullDetails.IsPresent) {
                     $ivItemView.PropertySet = $ItemPropsetIdOnly
@@ -215,6 +220,14 @@ function Invoke-GenericFolderItemEnum {
                                     write-host ("Downloaded Attachment : " + (($FolderPath + "\" + $attach.Name.ToString())))
                                 }
                             }
+                             if($ReturnSentiment.IsPresent){
+                                $SentimentValue = $null
+                                if($Item.TryGetProperty($Sentiment,[ref]$SentimentValue)){
+                                    $emotiveProfile =ConvertFrom-Json -InputObject $SentimentValue
+				                    Add-Member -InputObject $Item -NotePropertyName "Sentiment" -NotePropertyValue $emotiveProfile.sentiment.polarity
+				                    Add-Member -InputObject $Item -NotePropertyName "EmotiveProfile" -NotePropertyValue $emotiveProfile
+                                }
+                             }
                             Add-Member -InputObject $Item -MemberType ScriptMethod -Name DownloadAttachments -Value $DownloadAttachments 
                             $Item | Add-Member -Name "FolderPath" -Value $Folder.FolderPath -MemberType NoteProperty
                             Write-Output $Item

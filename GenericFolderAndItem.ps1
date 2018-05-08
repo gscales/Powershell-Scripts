@@ -117,7 +117,42 @@ function Handle-SSL {
 }
 
 
-
+function Send-EWSMessage  {
+     param( 
+        [Parameter(Position=0, Mandatory=$true)] [string]$MailboxName,
+        [Parameter(Mandatory=$true)] [System.Management.Automation.PSCredential]$Credentials,
+        [Parameter(Position=2, Mandatory=$false)] [switch]$useImpersonation,
+        [Parameter(Position=3, Mandatory=$false)] [string]$url,
+        [Parameter(Position=6, Mandatory=$true)] [String]$To,
+        [Parameter(Position=7, Mandatory=$true)] [String]$Subject,
+        [Parameter(Position=8, Mandatory=$true)] [String]$Body,
+        [Parameter(Position=9, Mandatory=$false)] [String]$Attachment
+    )  
+  Begin
+ {
+    $service = Connect-Exchange -MailboxName $MailboxName -Credentials $Credentials -url $url
+    if ($useImpersonation.IsPresent) {
+        $service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)        
+    }
+    $service.HttpHeaders.Add("X-AnchorMailbox", $MailboxName);  
+    $folderid= new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::SentItems,$MailboxName)   
+    $SentItems = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderid)
+    $EmailMessage = New-Object Microsoft.Exchange.WebServices.Data.EmailMessage -ArgumentList $service  
+    $EmailMessage.Subject = $Subject
+    #Add Recipients    
+    $EmailMessage.ToRecipients.Add($To)  
+    $EmailMessage.Body = New-Object Microsoft.Exchange.WebServices.Data.MessageBody  
+    $EmailMessage.Body.BodyType = [Microsoft.Exchange.WebServices.Data.BodyType]::HTML  
+    $EmailMessage.Body.Text = $Body
+    $EmailMessage.From = $MailboxName
+    if($Attachment)
+    {   
+    $EmailMessage.Attachments.AddFileAttachment($Attachment)
+    }
+    $EmailMessage.SendAndSaveCopy($SentItems.Id) 
+  
+ }
+}
 
 function Invoke-GenericFolderItemEnum {
     param( 
@@ -128,11 +163,12 @@ function Invoke-GenericFolderItemEnum {
         [Parameter(Position = 4, Mandatory = $true)] [string]$FolderPath,
         [Parameter(Position = 5, Mandatory = $false)] [switch]$Recurse,
         [Parameter(Position = 6, Mandatory = $false)] [switch]$FullDetails,
-        [Parameter(Position = 6, Mandatory = $false)] [switch]$ReturnSentiment,
+        [Parameter(Position = 6, Mandatory = $false)] [switch]$ReturnSentiment,       
         [Parameter(Position = 7, Mandatory = $false)] [Int]$MaxCount 
     )  
     Process {
         $folders = Invoke-GenericFolderConnect -MailboxName $MailboxName -Credentials $Credentials -url $url -useImpersonation:$useImpersonation.IsPresent -FolderPath $FolderPath -Recurse:$Recurse.IsPresent
+        $PR_ENTRYID = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x0FFF,[Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Binary)  
         foreach ($Folder in $folders) {
                 if($MaxCount -gt 0){
                     $Script:MaxCount = $MaxCount
@@ -155,6 +191,8 @@ function Invoke-GenericFolderItemEnum {
                     $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000)
                 }                
                 $ItemPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
+                $ItemPropset.Add($PR_ENTRYID)
+                $ItemPropset.Add([Microsoft.Exchange.WebServices.Data.EmailMessageSchema]::Preview)
                 if($ReturnSentiment.IsPresent){
                     $Sentiment = New-Object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition([Microsoft.Exchange.WebServices.Data.DefaultExtendedPropertySet]::Common,"EntityExtraction/Sentiment1.0", [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::String);
                     $ItemPropset.Add($Sentiment)

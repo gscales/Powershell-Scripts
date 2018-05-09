@@ -566,7 +566,7 @@ function Get-EWSDigestEmailBody
             }	
 			$fromstring = $message.From.Address
 			if ($fromstring.length -gt 30){$fromstring = $fromstring.Substring(0,30)}
-			$HeaderLine  = [DateTime]::Parse($message.DateTimeReceived).ToString("G") + " : " + $fromstring + " : " + $message.Subject
+			$HeaderLine  = $message.DateTimeReceived.ToString("G") + " : " + $fromstring + " : " + $message.Subject
 			$BodyLine = $message.Preview
 			if($weblink.IsPresent){
 				$BodyLine += "`r`n</br></br><a href=`"" + $message.WebClientReadFormQueryString + "`">MoreInfo</a href>"

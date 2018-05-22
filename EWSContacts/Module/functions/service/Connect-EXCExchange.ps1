@@ -100,7 +100,7 @@
 		
 		#CAS URL Option 1 Autodiscover  
 		$service.AutodiscoverUrl($MailboxName, { $true })
-		Write-host ("Using CAS Server : " + $Service.url)
+		#Write-host ("Using CAS Server : " + $Service.url)
 		
 		#CAS URL Option 2 Hardcoded  
 		

@@ -75,6 +75,7 @@
 				if ($fiItems.Items.Count -gt 0)
 				{
 					$psPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
+					$psPropset.RequestedBodyType = [Microsoft.Exchange.WebServices.Data.BodyType]::Text
 					[Void]$service.LoadPropertiesForItems($fiItems, $psPropset)
 					foreach ($Item in $fiItems.Items)
 					{

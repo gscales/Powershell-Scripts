@@ -72,12 +72,14 @@
 		'Get-EXCContactGroup',
 		'Get-EXCContacts',
 		'Get-EXCAllContactFolders',
+		'Get-EXCContactGroups',
 		'New-EXCContact',
 		'New-EXCContactGroup',
 		'Get-EXCPrivacyReport',
 		'Remove-EXCContact',
 		'Search-EXCContactsForCCNumbers',
 		'Search-EXCAllContactFolders',
+		'Search-EXCAllContactGroups',
 		'Set-EXCContact'
 	)
 	

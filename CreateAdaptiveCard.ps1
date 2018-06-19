@@ -4,7 +4,9 @@ function New-AdaptiveCard {
         [Parameter(Position = 1, Mandatory = $false)] [switch]$DontHideBody,
         [Parameter(Position = 2, Mandatory = $false)] [Int]$ColorSwitchColumnNumber,
         [Parameter(Position = 3, Mandatory = $false)] [psObject]$ColorSwitchHashTable,
-        [Parameter(Position = 4, Mandatory = $false)] [String]$ColorSwitchDefault
+        [Parameter(Position = 4, Mandatory = $false)] [String]$ColorSwitchDefault,
+        [Parameter(Position = 5, Mandatory = $false)] [String]$originator
+        
     )  
     Process {
         $AdaptiveCard = @{}
@@ -12,7 +14,10 @@ function New-AdaptiveCard {
         $AdaptiveCard.Add("type","AdaptiveCard")
         if(!$DontHideBody.IsPresent){
             $AdaptiveCard.Add("hideOriginalBody","true")
-        }        
+        } 
+        if([String]::IsNullOrEmpty($originator)){
+            $AdaptiveCard.Add("originator",$originator)
+        }       
         $Body = @()
         $BodyHash = @{}
         $BodyHash.Add("type","ColumnSet")

@@ -2,7 +2,7 @@ function Connect-Exchange {
     param( 
         [Parameter(Position = 0, Mandatory = $true)] [string]$MailboxName,        
         [Parameter(Position = 1, Mandatory = $false)] [string]$url,
-		[Parameter(Position = 2, Mandatory = $false)] [string]$ClientId,
+        [Parameter(Position = 2, Mandatory = $false)] [string]$ClientId,
         [Parameter(Position = 3, Mandatory = $false)] [string]$redirectUrl,
         [Parameter(Position = 4, Mandatory = $false)] [string]$AccessToken,
         [Parameter(Position = 5, Mandatory = $false)] [switch]$basicAuth,
@@ -13,9 +13,10 @@ function Connect-Exchange {
         Load-EWSManagedAPI
 		
         ## Set Exchange Version  
-        if([Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016){
+        if ([Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016) {
             $ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
-        }else{
+        }
+        else {
             $ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2013_SP1
         }
         
@@ -24,21 +25,23 @@ function Connect-Exchange {
         $service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($ExchangeVersion)  
 		  
         ## Set Credentials to use two options are availible Option1 to use explict credentials or Option 2 use the Default (logged On) credentials  
-		if($basicAuth.IsPresent){
+        if ($basicAuth.IsPresent) {
             $creds = New-Object System.Net.NetworkCredential($Credentials.UserName.ToString(), $Credentials.GetNetworkCredential().password.ToString())  
             $service.Credentials = $creds    
-        }else{
-            if([String]::IsNullOrEmpty($AccessToken)){
+        }
+        else {
+            if ([String]::IsNullOrEmpty($AccessToken)) {
                 $Resource = "Outlook.Office365.com"    
-                if([String]::IsNullOrEmpty($ClientId)){
+                if ([String]::IsNullOrEmpty($ClientId)) {
                     $ClientId = "d3590ed6-52b3-4102-aeff-aad2292ab01c"
                 }
-                if([String]::IsNullOrEmpty($redirectUrl)){
+                if ([String]::IsNullOrEmpty($redirectUrl)) {
                     $redirectUrl = "urn:ietf:wg:oauth:2.0:oob"  
                 }
                 $Script:Token = Get-EWSAccessToken -MailboxName $MailboxName -ClientId $ClientId -redirectUrl $redirectUrl  -ResourceURL $Resource -Prompt $Prompt -CacheCredentials   
                 $OAuthCredentials = New-Object Microsoft.Exchange.WebServices.Data.OAuthCredentials((ConvertFrom-SecureStringCustom -SecureToken $Script:Token.access_token))
-            }else{
+            }
+            else {
                 $OAuthCredentials = New-Object Microsoft.Exchange.WebServices.Data.OAuthCredentials($AccessToken)
             }    
             $service.Credentials = $OAuthCredentials
@@ -138,7 +141,7 @@ function Handle-SSL {
         $TrustAll = $TAAssembly.CreateInstance("Local.ToolkitExtensions.Net.CertificatePolicy.TrustAll")
         [System.Net.ServicePointManager]::CertificatePolicy = $TrustAll
 
-        ## end code from http://poshcode.org/624
+        ## end code from http://poshcode.org/624 ##
 
     }
 }
@@ -163,12 +166,13 @@ function Get-LAPFIDItemsFromFolder {
 
     )  
     Process {
-        if($basicAuth.IsPresent){
-            if(!$Credentials){
+        if ($basicAuth.IsPresent) {
+            if (!$Credentials) {
                 $Credentials = Get-Credential
             }
             $service = Connect-Exchange -MailboxName $MailboxName -url $url -basicAuth -Credentials $Credentials
-        }else{
+        }
+        else {
             $service = Connect-Exchange -MailboxName $MailboxName -url $url -AccessToken $AccessToken
         }
         
@@ -203,12 +207,13 @@ function Get-LAPFIDItemsFromFolder {
                 $ArchiveFolderId = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::ArchiveRecoverableItemsPurges, $MailboxName)
             }
             else {
-                if($deletedItems.IsPresent){
+                if ($deletedItems.IsPresent) {
                     $folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::DeletedItems, $MailboxName)
                     $dlFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $folderid)
                     $ArchiveFolderId = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::ArchiveDeletedItems, $MailboxName)
     
-                }else{
+                }
+                else {
                     $foundFolder = Get-FolderFromPath -MailboxName $MailboxName -service $service -FolderPath $FolderPath           
                     $dlFolder = $foundFolder
                 }
@@ -293,10 +298,11 @@ function Invoke-GenericFolderItemEnum {
         do { 
             $error.clear()
             try {
-                if([String]::IsNullOrEmpty($QueryString)){
+                if ([String]::IsNullOrEmpty($QueryString)) {
                     $fiItems = $Folder.service.FindItems($Folder.Id, $ivItemView) 
-                }else{
-                    $fiItems = $Folder.service.FindItems($Folder.Id,$QueryString, $ivItemView) 
+                }
+                else {
+                    $fiItems = $Folder.service.FindItems($Folder.Id, $QueryString, $ivItemView) 
                 }
                 
             }
@@ -306,10 +312,11 @@ function Invoke-GenericFolderItemEnum {
                     Write-Host ("EWS Error : " + ($_.Exception.ErrorCode))
                     Start-Sleep -Seconds 60 
                 }	
-                if([String]::IsNullOrEmpty($QueryString)){
+                if ([String]::IsNullOrEmpty($QueryString)) {
                     $fiItems = $Folder.service.FindItems($Folder.Id, $ivItemView) 
-                }else{
-                    $fiItems = $Folder.service.FindItems($Folder.Id,$QueryString, $ivItemView) 
+                }
+                else {
+                    $fiItems = $Folder.service.FindItems($Folder.Id, $QueryString, $ivItemView) 
                 }
             }
             if ($FullDetails.IsPresent) {
@@ -369,12 +376,13 @@ function Invoke-GenericFolderConnect {
 
     )  
     Process {
-        if($basicAuth.IsPresent){
-            if(!$Credentials){
+        if ($basicAuth.IsPresent) {
+            if (!$Credentials) {
                 $Credentials = Get-Credential
             }
             $service = Connect-Exchange -MailboxName $MailboxName -url $url -basicAuth -Credentials $Credentials
-        }else{
+        }
+        else {
             $service = Connect-Exchange -MailboxName $MailboxName -url $url -AccessToken $AccessToken
         }
         $service.HttpHeaders.Add("X-AnchorMailbox", $MailboxName);  

@@ -320,9 +320,7 @@ function Get-ConversationLog {
                     foreach ($rcp in $rcps) {
                         if (![String]::IsNullOrEmpty($rcp)) {
                             if (!$rptObject.PeopleMessaged.ContainsKey($rcp)) {
-                                if (!$rcp.Contains($Script:SipAddress)) {
-                                    $rptObject.PeopleMessaged.Add($rcp, "");
-                                }   
+                                $rptObject.PeopleMessaged.Add($rcp, "");
                             }
                         }
                     }

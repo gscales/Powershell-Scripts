@@ -20,7 +20,7 @@ function Invoke-UnsubscribeEmail {
             'Content-Type'  = 'application\json'
             'Authorization' = $token.CreateAuthorizationHeader()
         }        
-        $Result =  Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/beta/users('" + $MailboxName + "')/MailFolders/Inbox/Messages?`$Top=10&`$select=ReceivedDateTime,Sender,Subject,IsRead,inferenceClassification,InternetMessageId,parentFolderId,hasAttachments,webLink,unsubscribeEnabled,unsubscribeData") -Method Get 
+        $Result =  Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/beta/users('" + $MailboxName + "')/MailFolders/Inbox/Messages?`$Top=1000&`$select=ReceivedDateTime,Sender,Subject,IsRead,inferenceClassification,InternetMessageId,parentFolderId,hasAttachments,webLink,unsubscribeEnabled,unsubscribeData") -Method Get 
         if ($Result.value -ne $null) {
             foreach ( $Message in $Result.value ) {
                 if($Message.unsubscribeEnabled){

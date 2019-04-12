@@ -22,7 +22,7 @@ function Get-MessageHeaderAndProcess {
         Import-Module .\Microsoft.IdentityModel.Clients.ActiveDirectory.dll -Force
         $PromptBehavior = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters -ArgumentList Auto       
         $Context = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext("https://login.microsoftonline.com/common")
-        $token = ($Context.AcquireTokenAsync("https://graph.microsoft.com", "b3738173-a400-47f4-96f9-56163a84910f", "urn:ietf:wg:oauth:2.0:oob", $PromptBehavior)).Result
+        $token = ($Context.AcquireTokenAsync("https://graph.microsoft.com", $ClientId , "urn:ietf:wg:oauth:2.0:oob", $PromptBehavior)).Result
         $Header = @{
             'Content-Type'  = 'application\json'
             'Authorization' = $token.CreateAuthorizationHeader()

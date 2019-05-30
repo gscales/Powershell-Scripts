@@ -30,14 +30,12 @@ function Send-VoiceMail {
             'Authorization' = $token.CreateAuthorizationHeader()
         }
 
-        $UserResult = Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/v1.0/users('" + $MailboxName + "')?`$Select=displayName,businessPhones,mobilePhone,mail,jobTitle,companyName") -Method Get -ContentType "Application/json"
+        $UserResult = (Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/v1.0/users?`$filter=mail eq '" + $MailboxName + "'&`$Select=displayName,businessPhones,mobilePhone,mail,jobTitle,companyName") -Method Get -ContentType "Application/json").value
         $VoiceMailSuject = "Voice Mail (" + $dt.TimeOfDay.TotalSeconds + " seconds)"
         $duration = $dt.TimeOfDay.TotalSeconds
         $voiceMailFrom = $UserResult.displayName
-        if ($UserResult.businessPhones.count -gt 0) {
-            $callerId = $UserResult.businessPhones[0]
-        }        
-        $jobTitle = $UserResult.jobTitle.ToString()
+        $callerId = $UserResult.businessPhones        
+        $jobTitle = $UserResult.jobTitle
         $Company = $UserResult.companyName
         $BusinessPhone = $callerId
         $emailAddress = $UserResult.mail

@@ -93,11 +93,17 @@ function Send-VoiceMail {
         $VoiceMessageTranscription.PropertyType = "Named"
         $VoiceMessageTranscription.Value = $Transcription
         $VoiceMessageTranscription.Type = "String"
+        $PidTagVoiceMessageAttachmentOrder = "" | Select Id, DataType, PropertyType, Value
+        $PidTagVoiceMessageAttachmentOrder.id = "0x6805"
+        $PidTagVoiceMessageAttachmentOrder.DataType = "String"
+        $PidTagVoiceMessageAttachmentOrder.PropertyType = "Tagged"
+        $PidTagVoiceMessageAttachmentOrder.Value = "audio.mp3"
         $exProp = @()
         $exProp += $ItemClassProp
         $exProp += $VoiceMailLength
         $exProp += $VoiceMessageConfidenceLevel
         $exProp += $VoiceMessageTranscription
+        $exProp += $PidTagVoiceMessageAttachmentOrder
         $Attachment = "" | Select name, contentBytes
         $Attachment.name = "audio.mp3"
         $Attachment.contentBytes = [System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Mp3FileName))

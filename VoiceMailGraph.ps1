@@ -17,8 +17,8 @@ function Send-VoiceMail {
         $file = Split-Path $Mp3FileName -Leaf
         $shellfolder = $shell.Namespace($folder)
         $shellfile = $shellfolder.ParseName($file)
-        $dt = [DateTime]::ParseExact($shellfolder.GetDetailsOf($shellfile, 27), "HH:mm:ss",[System.Globalization.CultureInfo]::InvariantCulture);
-        if([String]::IsNullOrEmpty($ClientId)){
+        $dt = [DateTime]::ParseExact($shellfolder.GetDetailsOf($shellfile, 27), "HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture);
+        if ([String]::IsNullOrEmpty($ClientId)) {
             $ClientId = "5471030d-f311-4c5d-91ef-74ca885463a7"
         }		
         Import-Module .\Microsoft.IdentityModel.Clients.ActiveDirectory.dll -Force
@@ -30,11 +30,11 @@ function Send-VoiceMail {
             'Authorization' = $token.CreateAuthorizationHeader()
         }
 
-        $UserResult =  Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/v1.0/users('" + $MailboxName + "')?`$Select=displayName,businessPhones,mobilePhone,mail,jobTitle,companyName") -Method Get -ContentType "Application/json"
+        $UserResult = Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/v1.0/users('" + $MailboxName + "')?`$Select=displayName,businessPhones,mobilePhone,mail,jobTitle,companyName") -Method Get -ContentType "Application/json"
         $VoiceMailSuject = "Voice Mail (" + $dt.TimeOfDay.TotalSeconds + " seconds)"
         $duration = $dt.TimeOfDay.TotalSeconds
         $voiceMailFrom = $UserResult.displayName
-        if($UserResult.businessPhones.count -gt 0){
+        if ($UserResult.businessPhones.count -gt 0) {
             $callerId = $UserResult.businessPhones[0]
         }        
         $jobTitle = $UserResult.jobTitle.ToString()
@@ -52,7 +52,7 @@ function Send-VoiceMail {
         $BodyHtml += "<tr><td width=`"12px`"></td><td width=`"28%`" nowrap=`"`" style=`"font-family: Tahoma; color: #686a6b; font-size:10pt;border-width: 0in;`">"
         $BodyHtml += "Company:</td><td width=`"72%`" style=`"font-family: Tahoma; background-color: #ffffff; color: #000000; font-size:10pt;`">"
         $BodyHtml += $Company + "</td></tr>"
-        $BodyHtml +=  "<tr><td width=`"12px`"></td><td width=`"28%`" nowrap=`"`" style=`"font-family: Tahoma; color: #686a6b; font-size:10pt;border-width: 0in;`">"
+        $BodyHtml += "<tr><td width=`"12px`"></td><td width=`"28%`" nowrap=`"`" style=`"font-family: Tahoma; color: #686a6b; font-size:10pt;border-width: 0in;`">"
         $BodyHtml += "Title:</td><td width=`"72%`" style=`"font-family: Tahoma; background-color: #ffffff; color: #000000; font-size:10pt;`">"
         $BodyHtml += $jobTitle + "</td></tr><tr><td width=`"12px`"></td><td width=`"28%`" nowrap=`"`" style=`"font-family: Tahoma; color: #686a6b; font-size:10pt;border-width: 0in;`">"
         $BodyHtml += "Work:</td><td width=`"72%`" style=`"font-family: Tahoma; background-color: #ffffff; color: #000000; font-size:10pt;`">"
@@ -67,26 +67,26 @@ function Send-VoiceMail {
         $SenderAddress = "" | Select-Object Name, Address
         $SenderAddress.Name = $MailboxName 
         $SenderAddress.Address = $MailboxName
-        $ItemClassProp = "" | Select Id,DataType,PropertyType,Value
+        $ItemClassProp = "" | Select Id, DataType, PropertyType, Value
         $ItemClassProp.id = "0x001A"
         $ItemClassProp.DataType = "String"
         $ItemClassProp.PropertyType = "Tagged"
         $ItemClassProp.Value = "IPM.Note.Microsoft.Voicemail.UM.CA"
-        $VoiceMailLength = "" | Select Id,DataType,PropertyType,Type,Guid,Value
+        $VoiceMailLength = "" | Select Id, DataType, PropertyType, Type, Guid, Value
         $VoiceMailLength.id = "0x6801"
         $VoiceMailLength.DataType = "Integer"
         $VoiceMailLength.Guid = "{00020328-0000-0000-c000-000000000046}"
         $VoiceMailLength.PropertyType = "Named"
         $VoiceMailLength.Type = "Id"
         $VoiceMailLength.Value = $dt.TimeOfDay.TotalSeconds
-        $VoiceMessageConfidenceLevel = "" | Select Id,DataType,Type,PropertyType,Guid,Value
+        $VoiceMessageConfidenceLevel = "" | Select Id, DataType, Type, PropertyType, Guid, Value
         $VoiceMessageConfidenceLevel.Id = "X-VoiceMessageConfidenceLevel"
         $VoiceMessageConfidenceLevel.DataType = "String"
         $VoiceMessageConfidenceLevel.Guid = "{00020386-0000-0000-C000-000000000046}"
         $VoiceMessageConfidenceLevel.PropertyType = "Named"
         $VoiceMessageConfidenceLevel.Value = "high"
         $VoiceMessageConfidenceLevel.Type = "String"
-        $VoiceMessageTranscription = "" | Select Id,DataType,Type,PropertyType,Guid,Value
+        $VoiceMessageTranscription = "" | Select Id, DataType, Type, PropertyType, Guid, Value
         $VoiceMessageTranscription.Id = "X-VoiceMessageTranscription"
         $VoiceMessageTranscription.DataType = "String"
         $VoiceMessageTranscription.Guid = "{00020386-0000-0000-C000-000000000046}"
@@ -98,15 +98,15 @@ function Send-VoiceMail {
         $exProp += $VoiceMailLength
         $exProp += $VoiceMessageConfidenceLevel
         $exProp += $VoiceMessageTranscription
-        $Attachment = "" | Select name,contentBytes
+        $Attachment = "" | Select name, contentBytes
         $Attachment.name = "audio.mp3"
         $Attachment.contentBytes = [System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Mp3FileName))
-        $NewMessage = Get-MessageJSONFormat -Subject $VoiceMailSuject -Body $BodyHtml.Replace("`"","\`"") -SenderEmailAddress $SenderAddress -Attachments @($Attachment) -ToRecipients @($ToRecp) -SaveToSentItems "true" -SendMail -ExPropList $exProp
-        $Result =  Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/v1.0/users('" + $MailboxName + "')/sendmail") -Method Post -Body $NewMessage -ContentType "Application/json"
-         if ($Result.value -ne $null) {
-             foreach ($Message in $Result.value ) {
-                 write-output $Message
-             }
+        $NewMessage = Get-MessageJSONFormat -Subject $VoiceMailSuject -Body $BodyHtml.Replace("`"", "\`"") -SenderEmailAddress $SenderAddress -Attachments @($Attachment) -ToRecipients @($ToRecp) -SaveToSentItems "true" -SendMail -ExPropList $exProp
+        $Result = Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/v1.0/users('" + $MailboxName + "')/sendmail") -Method Post -Body $NewMessage -ContentType "Application/json"
+        if ($Result.value -ne $null) {
+            foreach ($Message in $Result.value ) {
+                write-output $Message
+            }
         }
        
        	
@@ -185,7 +185,7 @@ function Get-MessageJSONFormat {
         [bool]
         $RequestDeliveryRecipient
     )
-    Begin {
+    Process {
         $NewMessage = "{" + "`r`n"
         if ($SendMail.IsPresent) {
             $NewMessage += "  `"Message`" : {" + "`r`n"
@@ -462,8 +462,8 @@ function Get-VoiceMail {
         [String]
         $ClientId
     )
-    Begin {        
-        if([String]::IsNullOrEmpty($ClientId)){
+    Process {        
+        if ([String]::IsNullOrEmpty($ClientId)) {
             $ClientId = "5471030d-f311-4c5d-91ef-74ca885463a7"
         }		
         Import-Module .\Microsoft.IdentityModel.Clients.ActiveDirectory.dll -Force
@@ -474,12 +474,12 @@ function Get-VoiceMail {
             'Content-Type'  = 'application\json'
             'Authorization' = $token.CreateAuthorizationHeader()
         }
-        $Result =  Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/v1.0/users('" + $MailboxName + "')/mailFolders/voicemail/messages?`$expand=SingleValueExtendedProperties(`$filter=Id%20eq%20'Integer%20{00020328-0000-0000-C000-000000000046}%20Id%200x6801'%20or%20Id%20eq%20'String%20{00020386-0000-0000-C000-000000000046}%20Name%20X-VoiceMessageConfidenceLevel'%20or%20Id%20eq%20'String%20{00020386-0000-0000-C000-000000000046}%20Name%20X-VoiceMessageTranscription')&`$top=100&`$select=Subject,From,Body,IsRead,Id,ReceivedDateTime")
+        $Result = Invoke-RestMethod -Headers $Header -Uri ("https://graph.microsoft.com/v1.0/users('" + $MailboxName + "')/mailFolders/voicemail/messages?`$expand=SingleValueExtendedProperties(`$filter=Id%20eq%20'Integer%20{00020328-0000-0000-C000-000000000046}%20Id%200x6801'%20or%20Id%20eq%20'String%20{00020386-0000-0000-C000-000000000046}%20Name%20X-VoiceMessageConfidenceLevel'%20or%20Id%20eq%20'String%20{00020386-0000-0000-C000-000000000046}%20Name%20X-VoiceMessageTranscription')&`$top=100&`$select=Subject,From,Body,IsRead,Id,ReceivedDateTime")
         if ($Result.value -ne $null) {
-             foreach ($Message in $Result.value ) {
-                 Expand-ExtendedProperties -Item $Message
-                 write-output $Message
-             }
+            foreach ($Message in $Result.value ) {
+                Expand-ExtendedProperties -Item $Message
+                write-output $Message
+            }
         }
        
        	
@@ -487,23 +487,18 @@ function Get-VoiceMail {
     }
 }
 
-function Expand-ExtendedProperties
-{
-	[CmdletBinding()] 
+function Expand-ExtendedProperties {
+    [CmdletBinding()] 
     param (
-		[Parameter(Position = 1, Mandatory = $false)]
-		[psobject]
-		$Item
-	)
+        [Parameter(Position = 1, Mandatory = $false)]
+        [psobject]
+        $Item
+    )
 	
- 	process
-	{
-		if ($Item.singleValueExtendedProperties -ne $null)
-		{
-			foreach ($Prop in $Item.singleValueExtendedProperties)
-			{
-				Switch ($Prop.Id)
-				{
+    process {
+        if ($Item.singleValueExtendedProperties -ne $null) {
+            foreach ($Prop in $Item.singleValueExtendedProperties) {
+                Switch ($Prop.Id) {
    	                "Integer {00020328-0000-0000-C000-000000000046} Id 0x6801" {
                         Add-Member -InputObject $Item -NotePropertyName "PidTagVoiceMessageDuration" -NotePropertyValue $Prop.Value
                     }

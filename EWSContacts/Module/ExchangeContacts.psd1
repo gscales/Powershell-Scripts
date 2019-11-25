@@ -65,6 +65,7 @@
 		'Connect-EXCExchange',
 		'Copy-EXCContactGalToMailbox',
 		'Export-EXCContact',
+		'Export-EXCContacts',
 		'Export-EXCContactFolder',
 		'Export-EXCGALContact',
 		'Get-EXCContact',

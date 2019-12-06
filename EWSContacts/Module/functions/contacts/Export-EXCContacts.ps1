@@ -28,19 +28,25 @@
 		A description of the Partial parameter.
 	
 	.EXAMPLE
-		Example 1 To Export a contact to local file
+		Example 1 To Export all contacts to local file vcf file
 		Export-EXCContacts -MailboxName mailbox@domain.com  -FileName c:\export\filename.vcf
 		If the file already exists it will handle creating a unique filename
 		
 	.EXAMPLE
 		Example 2 To export from a contacts subfolder use
 		Export-EXCContacts -MailboxName mailbox@domain.com  -FileName c:\export\filename.vcf -folder \contacts\subfolder
+
+	.EXAMPLE
+		Example 3 To Export a contact to local csv file
+		Export-EXCContacts -MailboxName mailbox@domain.com  -FileName c:\export\filename.vcf -ExportAsCSV
+		If the file already exists it will handle creating a unique filename
 #>
 	[CmdletBinding()]
 	param (
 		[Parameter(Position = 0, Mandatory = $true)]
 		[string]
-		$MailboxName,		
+		$MailboxName,
+		
 	
 		[Parameter(Position = 2, Mandatory = $true)]
 		[System.Management.Automation.PSCredential]
@@ -52,9 +58,15 @@
 		
 		[Parameter(Position = 4, Mandatory = $false)]
 		[string]
-		$Folder
+		$Folder,
 		
+		[Parameter(Position = 5, Mandatory = $false)]
+		[switch]
+		$Partial,
 
+		[Parameter(Position = 6, Mandatory = $false)]
+		[switch]
+		$ExportAsCSV	
 		
 	)
 	Begin
@@ -63,37 +75,48 @@
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContact -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -Partial
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -Partial -ForExportToVcf
 			}
 			else
 			{
-				$Contacts = Get-EXCContact -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -ForExportToVcf
 			}
 		}
 		else
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Partial
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Partial -ForExportToVcf
 			}
 			else
 			{
-				$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials
+				$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -ForExportToVcf
 			}
 		}
+		$ExportCollection = @()
 		$FileName = Get-UniqueFileName -FileName $FileName
-		
+		if($ExportAsCSV.IsPresent){
+		}else{
+			$AppendStream = new-object System.IO.FileStream($FileName,[System.IO.FileMode]::Append)
+		}		
 		$Contacts | ForEach-Object{
 			$Contact = $_
-			$psPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
-			$psPropset.Add([Microsoft.Exchange.WebServices.Data.ItemSchema]::MimeContent);
-			$Contact.load($psPropset)			
-			
-			$AppendStream.Write($Contact.MimeContent.Content, 0, $Contact.MimeContent.Content.Length);
+			if($ExportAsCSV.IsPresent){
+				$csvEntry = Invoke-ContactToCSVEntry -Contact $Contact
+				$ExportCollection += $csvEntry
+			}else{
+				$AppendStream.Write($Contact.MimeContent.Content, 0, $Contact.MimeContent.Content.Length);
+				write-host ("Exporting : " + $Contact.Subject)
+			}
+
 		}
-		$AppendStream.Close();
-		$AppendStream.Dispose()
-		write-host "Exported $FileName"
+		if($ExportAsCSV.IsPresent){
+			$ExportCollection | export-csv -NoTypeInformation -Path $FileName
+		}else{
+			$AppendStream.Close();
+			$AppendStream.Dispose()
+		}
+		write-host "Exported $FileName"		
 		
 		
 	}

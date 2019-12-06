@@ -4,7 +4,7 @@
 	ModuleToProcess = 'ExchangeContacts.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.3.0.0'
+	ModuleVersion = '1.4.0.0'
 	
 	# ID used to uniquely identify this module
 	GUID = '6901af86-a39e-4a4c-afa6-b8ead127c674'
@@ -66,6 +66,7 @@
 		'Copy-EXCContactGalToMailbox',
 		'Export-EXCContact',
 		'Export-EXCContacts',
+		'Export-EXCRootContacts',
 		'Export-EXCContactFolder',
 		'Export-EXCGALContact',
 		'Get-EXCContact',
@@ -81,6 +82,7 @@
 		'Search-EXCContactsForCCNumbers',
 		'Search-EXCAllContactFolders',
 		'Search-EXCAllContactGroups',
+		'Invoke-ContactToCSVEntry',
 		'Set-EXCContact'
 	)
 	

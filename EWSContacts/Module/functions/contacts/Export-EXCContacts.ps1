@@ -48,7 +48,7 @@
 		$MailboxName,
 		
 	
-		[Parameter(Position = 2, Mandatory = $true)]
+		[Parameter(Position = 2, Mandatory = $false)]
 		[System.Management.Automation.PSCredential]
 		$Credentials,
 		
@@ -66,7 +66,16 @@
 
 		[Parameter(Position = 6, Mandatory = $false)]
 		[switch]
-		$ExportAsCSV	
+		$ExportAsCSV,
+		
+		
+		[Parameter(Position = 7, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 8, Mandatory = $False)]
+		[String]
+		$ClientId
 		
 	)
 	Begin
@@ -75,22 +84,22 @@
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -Partial -ForExportToVcf
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -Partial -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			}
 			else
 			{
-				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -ForExportToVcf
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			}
 		}
 		else
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Partial -ForExportToVcf
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Partial -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			}
 			else
-			{
-				$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -ForExportToVcf
+			{ 
+				$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			}
 		}
 		$ExportCollection = @()

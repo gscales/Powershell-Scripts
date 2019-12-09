@@ -28,7 +28,7 @@
 		[Microsoft.Exchange.WebServices.Data.ExchangeService]
 		$service,
 		
-		[Parameter(Position = 1, Mandatory = $true)]
+		[Parameter(Position = 1, Mandatory = $false)]
 		[PSCredential]
 		$Credentials,
 		
@@ -44,8 +44,7 @@
 	{
 		$ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2013_SP1
 		$AutoDiscoverService = New-Object  Microsoft.Exchange.WebServices.Autodiscover.AutodiscoverService($ExchangeVersion);
-		$creds = New-Object System.Net.NetworkCredential($Credentials.UserName.ToString(), $Credentials.GetNetworkCredential().password.ToString())
-		$AutoDiscoverService.Credentials = $creds
+		$AutoDiscoverService.Credentials = $service.Credentials
 		$AutoDiscoverService.EnableScpLookup = $false;
 		$AutoDiscoverService.RedirectionUrlValidationCallback = { $true };
 		$AutoDiscoverService.PreAuthenticate = $true;

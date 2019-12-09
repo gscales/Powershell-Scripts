@@ -58,12 +58,20 @@
 		$Members,
 		
 		[switch]
-		$useImpersonation
+		$useImpersonation, 
+
+		[Parameter(Position = 7, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 8, Mandatory = $False)]
+		[String]
+		$ClientId
 	)
 	Begin
 	{
 		#Connect
-		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials
+		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 		if ($useImpersonation)
 		{
 			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)

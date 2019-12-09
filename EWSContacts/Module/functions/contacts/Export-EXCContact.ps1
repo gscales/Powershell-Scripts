@@ -46,7 +46,7 @@
 		[string]
 		$EmailAddress,
 		
-		[Parameter(Position = 2, Mandatory = $true)]
+		[Parameter(Position = 2, Mandatory = $false)]
 		[System.Management.Automation.PSCredential]
 		$Credentials,
 		
@@ -60,7 +60,16 @@
 		
 		[Parameter(Position = 5, Mandatory = $false)]
 		[switch]
-		$Partial
+		$Partial,
+		
+
+		[Parameter(Position = 6, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 7, Mandatory = $False)]
+		[String]
+		$ClientId
 		
 	)
 	Begin
@@ -69,22 +78,22 @@
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Folder $Folder -Partial
+				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Folder $Folder -Partial -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			}
 			else
 			{
-				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Folder $Folder
+				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Folder $Folder -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			}
 		}
 		else
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Partial
+				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Partial -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			}
 			else
 			{
-				$Contacts =  Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials
+				$Contacts =  Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			}
 		}
 		

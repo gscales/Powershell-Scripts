@@ -39,7 +39,7 @@
 		[string]
 		$MailboxName,		
 	
-		[Parameter(Position = 2, Mandatory = $true)]
+		[Parameter(Position = 2, Mandatory = $false)]
 		[System.Management.Automation.PSCredential]
 		$Credentials,
 		
@@ -53,7 +53,15 @@
 		
 		[Parameter(Position = 5, Mandatory = $false)]
 		[switch]
-		$ExportAsCSV	
+		$ExportAsCSV,		
+				
+		[Parameter(Position = 7, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 8, Mandatory = $False)]
+		[String]
+		$ClientId
 	)
 	Begin
 	{
@@ -61,9 +69,9 @@
 		$DupTrack = @{}
 		$FileName = Get-UniqueFileName -FileName $FileName
 		if($ExportAsCSV.IsPresent){
-			$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -RootFolderName $FolderName 
+			$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -RootFolderName $FolderName  -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 		}else{
-			$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -RootFolderName $FolderName -ForExportToVcf
+			$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -RootFolderName $FolderName -ForExportToVcf  -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 			$AppendStream = new-object System.IO.FileStream($FileName,[System.IO.FileMode]::Append)
 		}		
 		$Contacts | ForEach-Object{

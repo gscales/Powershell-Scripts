@@ -1,6 +1,5 @@
-﻿function Connect-EXCExchange
-{
-<#
+﻿function Connect-EXCExchange {
+	<#
 	.SYNOPSIS
 		A brief description of the Connect-EXCExchange function.
 	
@@ -22,41 +21,48 @@
 		[string]
 		$MailboxName,
 		
-		[Parameter(Position = 1, Mandatory = $true)]
+		[Parameter(Position = 1, Mandatory = $False)]
 		[System.Management.Automation.PSCredential]
-		$Credentials
+		$Credentials,
+
+		[Parameter(Position = 2, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 3, Mandatory = $False)]
+		[String]
+		$ClientId
 	)
-	Begin
-	{
+	Begin {
 		## Load Managed API dll  
 		###CHECK FOR EWS MANAGED API, IF PRESENT IMPORT THE HIGHEST VERSION EWS DLL, ELSE EXIT
-        if (Test-Path ($script:ModuleRoot + "/bin/Microsoft.Exchange.WebServices.dll")) {
-            Import-Module ($script:ModuleRoot + "/bin/Microsoft.Exchange.WebServices.dll")
-            $Script:EWSDLL = $script:ModuleRoot + "/bin/Microsoft.Exchange.WebServices.dll"
-            write-verbose ("Using EWS dll from Local Directory")
-        }
-        else {
+		if (Test-Path ($script:ModuleRoot + "/bin/Microsoft.Exchange.WebServices.dll")) {
+			Import-Module ($script:ModuleRoot + "/bin/Microsoft.Exchange.WebServices.dll")
+			$Script:EWSDLL = $script:ModuleRoot + "/bin/Microsoft.Exchange.WebServices.dll"
+			write-verbose ("Using EWS dll from Local Directory")
+		}
+		else {
 
 			
-            ## Load Managed API dll  
-            ###CHECK FOR EWS MANAGED API, IF PRESENT IMPORT THE HIGHEST VERSION EWS DLL, ELSE EXIT
-            $EWSDLL = (($(Get-ItemProperty -ErrorAction SilentlyContinue -Path Registry::$(Get-ChildItem -ErrorAction SilentlyContinue -Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Exchange\Web Services'|Sort-Object Name -Descending| Select-Object -First 1 -ExpandProperty Name)).'Install Directory') + "Microsoft.Exchange.WebServices.dll")
-            if (Test-Path $EWSDLL) {
-                Import-Module $EWSDLL
-                $Script:EWSDLL = $EWSDLL 
-            }
-            else {
-                "$(get-date -format yyyyMMddHHmmss):"
-                "This script requires the EWS Managed API 1.2 or later."
-                "Please download and install the current version of the EWS Managed API from"
-                "http://go.microsoft.com/fwlink/?LinkId=255472"
-                ""
-                "Exiting Script."
-                exit
+			## Load Managed API dll  
+			###CHECK FOR EWS MANAGED API, IF PRESENT IMPORT THE HIGHEST VERSION EWS DLL, ELSE EXIT
+			$EWSDLL = (($(Get-ItemProperty -ErrorAction SilentlyContinue -Path Registry::$(Get-ChildItem -ErrorAction SilentlyContinue -Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Exchange\Web Services'|Sort-Object Name -Descending| Select-Object -First 1 -ExpandProperty Name)).'Install Directory') + "Microsoft.Exchange.WebServices.dll")
+			if (Test-Path $EWSDLL) {
+				Import-Module $EWSDLL
+				$Script:EWSDLL = $EWSDLL 
+			}
+			else {
+				"$(get-date -format yyyyMMddHHmmss):"
+				"This script requires the EWS Managed API 1.2 or later."
+				"Please download and install the current version of the EWS Managed API from"
+				"http://go.microsoft.com/fwlink/?LinkId=255472"
+				""
+				"Exiting Script."
+				exit
 
 
-            } 
-        }
+			} 
+		}
 		
 		## Set Exchange Version  
 		$ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2010_SP2
@@ -68,8 +74,31 @@
 		
 		#Credentials Option 1 using UPN for the windows Account  
 		#$psCred = Get-Credential  
-		$creds = New-Object System.Net.NetworkCredential($Credentials.UserName.ToString(), $Credentials.GetNetworkCredential().password.ToString())
-		$service.Credentials = $creds
+		if ($ModernAuth.IsPresent) {
+			Write-Verbose("Using Modern Auth")
+			if ([String]::IsNullOrEmpty($ClientId)) {
+				$ClientId = "d3590ed6-52b3-4102-aeff-aad2292ab01c"
+			}		
+			Import-Module ($script:ModuleRoot + "/bin/Microsoft.IdentityModel.Clients.ActiveDirectory.dll") -Force
+			$Context = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext("https://login.microsoftonline.com/common")
+			if ($Credentials -eq $null) {
+				$PromptBehavior = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters -ArgumentList Auto  
+				
+				$token = ($Context.AcquireTokenAsync("https://outlook.office365.com", $ClientId , "urn:ietf:wg:oauth:2.0:oob", $PromptBehavior)).Result
+				$service.Credentials = New-Object Microsoft.Exchange.WebServices.Data.OAuthCredentials($token.AccessToken)
+			}else{
+				$AADcredential = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.UserPasswordCredential" -ArgumentList  $Credentials.UserName.ToString(), $Credentials.GetNetworkCredential().password.ToString()
+				$token = [Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContextIntegratedAuthExtensions]::AcquireTokenAsync($Context,"https://outlook.office365.com",$ClientId,$AADcredential).result
+				$service.Credentials = New-Object Microsoft.Exchange.WebServices.Data.OAuthCredentials($token.AccessToken)
+			}
+		}
+		else {
+			Write-Verbose("Using Negotiate Auth")
+			if(!$Credentials){$Credentials = Get-Credential}
+			$creds = New-Object System.Net.NetworkCredential($Credentials.UserName.ToString(), $Credentials.GetNetworkCredential().password.ToString())
+			$service.Credentials = $creds
+		}
+
 		#Credentials Option 2  
 		#service.UseDefaultCredentials = $true  
 		#$service.TraceEnabled = $true
@@ -121,12 +150,10 @@
 		## Optional section for Exchange Impersonation  
 		
 		#$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName) 
-		if (!$service.URL)
-		{
+		if (!$service.URL) {
 			throw "Error connecting to EWS"
 		}
-		else
-		{
+		else {
 			return $service
 		}
 	}

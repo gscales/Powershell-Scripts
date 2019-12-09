@@ -22,16 +22,15 @@
 		[string]
 		$EmailAddress,
 		
-		[Parameter(Position = 1, Mandatory = $true)]
-		[System.Management.Automation.PSCredential]
-		$Credentials
+		[Parameter(Position = 1, Mandatory = $false)]
+		[Microsoft.Exchange.WebServices.Data.ExchangeService]
+		$service
 	)
 	process
 	{
 		$ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2013
 		$adService = New-Object Microsoft.Exchange.WebServices.AutoDiscover.AutodiscoverService($ExchangeVersion);
-		$creds = New-Object System.Net.NetworkCredential($Credentials.UserName.ToString(), $Credentials.GetNetworkCredential().password.ToString())
-		$adService.Credentials = $creds
+		$adService.Credentials = $service.Credentials
 		$adService.EnableScpLookup = $false;
 		$adService.RedirectionUrlValidationCallback = { $true }
 		$UserSettings = new-object Microsoft.Exchange.WebServices.Autodiscover.UserSettingName[] 1

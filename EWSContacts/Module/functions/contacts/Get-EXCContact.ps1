@@ -57,7 +57,7 @@
 		[string]
 		$EmailAddress,
 		
-		[Parameter(Position = 2, Mandatory = $true)]
+		[Parameter(Position = 2, Mandatory = $false)]
 		[System.Management.Automation.PSCredential]
 		$Credentials,
 		
@@ -72,12 +72,20 @@
 		$Partial,
 		
 		[switch]
-		$useImpersonation
+		$useImpersonation,
+
+		[Parameter(Position = 6, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 7, Mandatory = $False)]
+		[String]
+		$ClientId
 	)
 	Begin
 	{
 		#Connect
-		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials
+		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 		if ($useImpersonation)
 		{
 			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)
@@ -150,7 +158,7 @@
 									if ($Result.Mailbox.MailboxType -eq [Microsoft.Exchange.WebServices.Data.MailboxType]::Mailbox)
 									{
 										$ResultWritten = $true
-										$UserDn = Get-UserDN -EmailAddress $Result.Mailbox.Address -Credentials $Credentials
+										$UserDn = Get-UserDN -EmailAddress $Result.Mailbox.Address -service $service
 										$cnpsPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
 										$ncCola = $service.ResolveName($UserDn, $ParentFolderIds, [Microsoft.Exchange.WebServices.Data.ResolveNameSearchLocation]::ContactsOnly, $true, $cnpsPropset);
 										if ($ncCola.Count -eq 0)

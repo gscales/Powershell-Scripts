@@ -35,7 +35,7 @@
 		[string]
 		$MailboxName,
 		
-		[Parameter(Position = 1, Mandatory = $true)]
+		[Parameter(Position = 1, Mandatory = $false)]
 		[System.Management.Automation.PSCredential]
 		$Credentials,
 		
@@ -53,12 +53,20 @@
 
 		[Parameter(Position = 5, Mandatory = $false)]
 		[switch]
-		$ForExportToVcf
+		$ForExportToVcf,
+
+		[Parameter(Position = 6, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 7, Mandatory = $False)]
+		[String]
+		$ClientId
 	)
-	Begin
+	Process
 	{
 		#Connect
-		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials
+		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId 
 		if ($useImpersonation)
 		{
 			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)

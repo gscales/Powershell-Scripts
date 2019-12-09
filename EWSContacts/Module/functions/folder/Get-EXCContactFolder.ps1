@@ -36,14 +36,22 @@
 		[Microsoft.Exchange.WebServices.Data.ExchangeService]
 		$Service, 
 
-		[Parameter(Position = 2, Mandatory = $false)]
+		[Parameter(Position = 3, Mandatory = $false)]
 		[String]
-		$MailboxName
+		$MailboxName,
+
+		[Parameter(Position = 4, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 5, Mandatory = $False)]
+		[String]
+		$ClientId
 	)
 	process
 	{
 		if(![String]::IsNullOrEmpty($MailboxName)){
-			$service = Connect-EXCExchange -MailboxName $MailboxName -Credentials $Credentials
+			$service = Connect-EXCExchange -MailboxName $MailboxName -Credentials $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 		}
 		## Find and Bind to Folder based on Path  
 		#Define the path to search should be seperated with \  

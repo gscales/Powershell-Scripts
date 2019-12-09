@@ -23,15 +23,15 @@
 		$EmailAddress,
 		
 		[Parameter(Mandatory = $true)]
-		[pscredential]
-		$Credentials
+		[Microsoft.Exchange.WebServices.Data.ExchangeService]
+		$service
+		
 	)
 	process
 	{
 		$version = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2013
 		$adService = New-Object Microsoft.Exchange.WebServices.Autodiscover.AutodiscoverService($version);
-		$creds = New-Object System.Net.NetworkCredential($Credentials.UserName.ToString(), $Credentials.GetNetworkCredential().password.ToString())
-		$adService.Credentials = $creds
+		$adService.Credentials = $service.Credentials
 		$adService.EnableScpLookup = $false;
 		$adService.RedirectionUrlValidationCallback = { $true }
 		$adService.PreAuthenticate = $true;

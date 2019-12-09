@@ -44,7 +44,7 @@
         [string]
         $MailboxName,
 		
-        [Parameter(Position = 1, Mandatory = $true)]
+        [Parameter(Position = 1, Mandatory = $false)]
         [System.Management.Automation.PSCredential]
         $Credentials,
 		
@@ -68,10 +68,19 @@
         [switch]
         $RecurseMailbox,
 
-        [Parameter(Position = 6, Mandatory = $false)]
+        [Parameter(Position = 6, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 7, Mandatory = $False)]
+		[String]
+		$ClientId,
+
+        [Parameter(Position = 8, Mandatory = $false)]
         [switch]
         $SkypeForBusinessContacts,
-		
+     
+       
         [ValidateSet('CSV')]
         [string]
         $OutputType = "CSV"
@@ -290,7 +299,7 @@
             }
         }
         # Connect
-        $service = Connect-EXCExchange -MailboxName $MailboxName -Credentials $Credentials
+        $service = Connect-EXCExchange -MailboxName $MailboxName -Credentials $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
     }
     process
     {

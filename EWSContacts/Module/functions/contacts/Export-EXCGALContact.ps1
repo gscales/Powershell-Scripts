@@ -45,7 +45,7 @@
 		[string]
 		$EmailAddress,
 		
-		[Parameter(Position = 2, Mandatory = $true)]
+		[Parameter(Position = 2, Mandatory = $false)]
 		[System.Management.Automation.PSCredential]
 		$Credentials,
 		
@@ -59,11 +59,20 @@
 		
 		[Parameter(Position = 5, Mandatory = $false)]
 		[switch]
-		$Partial
+		$Partial,
+				
+		[Parameter(Position = 6, Mandatory = $False)]
+		[switch]
+		$ModernAuth,
+		
+		[Parameter(Position = 7, Mandatory = $False)]
+		[String]
+		$ClientId
+		
 	)
 	process
 	{
-		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials
+		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
 		$Error.Clear()
 		$cnpsPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
 		$ncCol = $service.ResolveName($EmailAddress, $ParentFolderIds, [Microsoft.Exchange.WebServices.Data.ResolveNameSearchLocation]::DirectoryOnly, $true, $cnpsPropset)
@@ -158,7 +167,7 @@
 					
 					if ($IncludePhoto)
 					{
-						$PhotoURL = Get-AutoDiscoverPhotoURL -EmailAddress $MailboxName -Credentials $Credentials
+						$PhotoURL = Get-AutoDiscoverPhotoURL -EmailAddress $MailboxName -service $service
 						$PhotoSize = "HR120x120"
 						$PhotoURL = $PhotoURL + "/GetUserPhoto?email=" + $ncCol.Mailbox.Address + "&size=" + $PhotoSize;
 						$wbClient = new-object System.Net.WebClient

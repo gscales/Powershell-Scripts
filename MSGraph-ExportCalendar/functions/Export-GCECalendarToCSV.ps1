@@ -95,7 +95,14 @@ function Export-GCECalendar {
         if ([String]::IsNullOrEmpty($redirectURL)) {
             $redirectURL = "urn:ietf:wg:oauth:2.0:oob"
         }		
-        Import-Module .\Microsoft.IdentityModel.Clients.ActiveDirectory.dll -Force
+        $adal = Join-Path $script:ModuleRoot "Microsoft.IdentityModel.Clients.ActiveDirectory.dll"
+        $adalforms = Join-Path $script:ModuleRoot "Microsoft.IdentityModel.Clients.ActiveDirectory.Platform.dll"
+        if([System.IO.File]::Exists($adal)){ 
+            Import-Module $adal -Force
+        }
+        if([System.IO.File]::Exists($adalforms)){ 
+           Import-Module $adalforms -Force
+        }  
         $PromptBehavior = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters -ArgumentList Auto       
         $Context = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext("https://login.microsoftonline.com/common")
         $token = ($Context.AcquireTokenAsync("https://graph.microsoft.com", $ClientId , $redirectURL, $PromptBehavior)).Result

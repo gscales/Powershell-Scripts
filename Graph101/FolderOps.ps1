@@ -113,9 +113,13 @@ function Get-FolderFromPath {
 
     process {
         
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
         $EndPoint = "https://graph.microsoft.com/v1.0/users"
         $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('MsgFolderRoot')/childfolders?"
-        $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$AutoPrompt.IsPresent
+        $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
         $fldArray = $FolderPath.Split("\")
         $PropList = @()
         $FolderSizeProp = Get-TaggedProperty -DataType "Long" -Id "0x66b3"
@@ -133,8 +137,7 @@ function Get-FolderFromPath {
                 'AnchorMailbox' = "$MailboxName"
             }
             $RequestURL = $RequestURL += "`&`$filter=DisplayName eq '$FolderName'"
-            $tfTargetFolder = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs" -Headers $headers).value    
-
+            $tfTargetFolder = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers).value  
             if ($tfTargetFolder.displayname -match $FolderName) {
                 $folderId = $tfTargetFolder.Id.ToString()
                 $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('$folderId')/childfolders?"

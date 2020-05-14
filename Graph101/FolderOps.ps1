@@ -1,9 +1,35 @@
-function Get-AccessTokenForGraph {
+function Show-OAuthWindow {
+    [CmdletBinding()]
+    param (
+        [System.Uri]
+        $Url
+    
+    )
     ## Start Code Attribution
-    ## Get-AccessTokenForGraph function contains work of the following Authors and should remain with the function if copied into other scripts
-    ## https://www.lee-ford.co.uk/getting-started-with-microsoft-graph-with-powershell/
+    ## Show-AuthWindow function is the work of the following Authors and should remain with the function if copied into other scripts
+    ## https://foxdeploy.com/2015/11/02/using-powershell-and-oauth/
+    ## https://blogs.technet.microsoft.com/ronba/2016/05/09/using-powershell-and-the-office-365-rest-api-with-oauth/
     ## End Code Attribution
-    ## 
+    Add-Type -AssemblyName System.Web
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $form = New-Object -TypeName System.Windows.Forms.Form -Property @{ Width = 440; Height = 640 }
+    $web = New-Object -TypeName System.Windows.Forms.WebBrowser -Property @{ Width = 420; Height = 600; Url = ($url) }
+    $Navigated = {
+      if($web.DocumentText -match "document.location.replace"){
+        $Script:oAuthCode = [regex]::match($web.DocumentText, "code=(.*?)\\u0026").Groups[1].Value
+        $form.Close();
+      }
+    }    
+    $web.ScriptErrorsSuppressed = $true
+    $web.Add_Navigated($Navigated)
+    $form.Controls.Add($web)
+    $form.Add_Shown( { $form.Activate() })
+    $form.ShowDialog() | Out-Null
+    return $Script:oAuthCode
+}
+
+function Get-AccessTokenForGraph {
     [CmdletBinding()]
     param (   
         [Parameter(Position = 1, Mandatory = $true)]
@@ -38,47 +64,11 @@ function Get-AccessTokenForGraph {
         $authURI += "&response_mode=query&scope=" + [System.Web.HttpUtility]::UrlEncode($scopes) + "&state=$state"
         if ($Prompt.IsPresent) {
             $authURI += "&prompt=select_account"
-        }
-        # Create Window for User Sign-In
-        $windowProperty = @{
-            Width  = 500
-            Height = 700
-        }
-        $signInWindow = New-Object System.Windows.Window -Property $windowProperty
-        # Create WebBrowser for Window
-        $browserProperty = @{
-            Width  = 480
-            Height = 680
-        }
-        $signInBrowser = New-Object System.Windows.Controls.WebBrowser -Property $browserProperty
-        [void]$signInBrowser.navigate($authURI)
-        
-        # Create a condition to check after each page load
-        $pageLoaded = {
-
-            # Once a URL contains "code=*", close the Window
-            if ($signInBrowser.Source -match "code=[^&]*") {
-
-                # With the form closed and complete with the code, parse the query string
-
-                $urlQueryString = [System.Uri]($signInBrowser.Source).Query
-                $script:urlQueryValues = [System.Web.HttpUtility]::ParseQueryString($urlQueryString)
-
-                [void]$signInWindow.Close()
-
-            }
-        }
-
-        # Add condition to document completed
-        [void]$signInBrowser.Add_LoadCompleted($pageLoaded)
-
-        # Show Window
-        [void]$signInWindow.AddChild($signInBrowser)
-        [void]$signInWindow.ShowDialog()
+        }     
 
         # Extract code from query string
-        $authCode = $script:urlQueryValues.GetValues(($script:urlQueryValues.keys | Where-Object { $_ -eq "code" }))
-        $Body = @{"grant_type" = "authorization_code"; "scope" = $scopes; "client_id" = "$ClientId"; "code" = $authCode[0]; "redirect_uri" = $RedirectURI }
+        $authCode = Show-OAuthWindow -Url $authURI
+        $Body = @{"grant_type" = "authorization_code"; "scope" = $scopes; "client_id" = "$ClientId"; "code" = $authCode; "redirect_uri" = $RedirectURI }
         $tokenRequest = Invoke-RestMethod -Method Post -ContentType application/x-www-form-urlencoded -Uri "https://login.microsoftonline.com/$tenantid/oauth2/token" -Body $Body 
         $AccessToken = $tokenRequest.access_token
         return $AccessToken

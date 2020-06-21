@@ -57,7 +57,7 @@ function Connect-Exchange {
             $service.Url = $uri    
         }
         else {
-            $service.AutodiscoverUrl($MailboxName, {$true})  
+            $service.AutodiscoverUrl($MailboxName, { $true })  
         }
         #Write-host ("Using CAS Server : " + $Service.url)   
 		   
@@ -75,9 +75,9 @@ function Connect-Exchange {
         else {	
             $Name = $service.ResolveName($MailboxName)	
             Write-Verbose("Exchange Version " + $service.ServerInfo.MajorVersion)
-            if ($service.ServerInfo.MajorVersion -ge 15){
+            if ($service.ServerInfo.MajorVersion -ge 15) {
                 $ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2013_SP1	
-                if($service.ServerInfo.MinorVersion -ge 20){                    
+                if ($service.ServerInfo.MinorVersion -ge 20) {                    
                     if ([Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016) {
                         $ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
                     }
@@ -86,11 +86,11 @@ function Connect-Exchange {
                     }   
                 }
                 $UpdatedService = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($ExchangeVersion)  
-				$UpdatedService.Credentials = $service.Credentials
-				$UpdatedService.Url = $service.Url;
+                $UpdatedService.Credentials = $service.Credentials
+                $UpdatedService.Url = $service.Url;
                 $service = $UpdatedService
                 write-verbose("Update Version")
-			}
+            }
             return, $service
         }
     }
@@ -101,32 +101,33 @@ function Invoke-LoadEWSManagedAPI {
     param( 
     )  
     Begin {
-        if(Test-Path ($script:ModuleRoot + "/Microsoft.Exchange.WebServices.dll")){
+        if (Test-Path ($script:ModuleRoot + "/Microsoft.Exchange.WebServices.dll")) {
             Import-Module ($script:ModuleRoot + "/Microsoft.Exchange.WebServices.dll")
             $Script:EWSDLL = $script:ModuleRoot + "/Microsoft.Exchange.WebServices.dll"
             write-verbose ("Using EWS dll from Local Directory")
-        }else{
-
-        
-        ## Load Managed API dll  
-        ###CHECK FOR EWS MANAGED API, IF PRESENT IMPORT THE HIGHEST VERSION EWS DLL, ELSE EXIT
-        $EWSDLL = (($(Get-ItemProperty -ErrorAction SilentlyContinue -Path Registry::$(Get-ChildItem -ErrorAction SilentlyContinue -Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Exchange\Web Services'|Sort-Object Name -Descending| Select-Object -First 1 -ExpandProperty Name)).'Install Directory') + "Microsoft.Exchange.WebServices.dll")
-        if (Test-Path $EWSDLL) {
-            Import-Module $EWSDLL
-            $Script:EWSDLL = $EWSDLL 
         }
         else {
-            "$(get-date -format yyyyMMddHHmmss):"
-            "This script requires the EWS Managed API 1.2 or later."
-            "Please download and install the current version of the EWS Managed API from"
-            "http://go.microsoft.com/fwlink/?LinkId=255472"
-            ""
-            "Exiting Script."
-            exit
+
+        
+            ## Load Managed API dll  
+            ###CHECK FOR EWS MANAGED API, IF PRESENT IMPORT THE HIGHEST VERSION EWS DLL, ELSE EXIT
+            $EWSDLL = (($(Get-ItemProperty -ErrorAction SilentlyContinue -Path Registry::$(Get-ChildItem -ErrorAction SilentlyContinue -Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Exchange\Web Services'|Sort-Object Name -Descending| Select-Object -First 1 -ExpandProperty Name)).'Install Directory') + "Microsoft.Exchange.WebServices.dll")
+            if (Test-Path $EWSDLL) {
+                Import-Module $EWSDLL
+                $Script:EWSDLL = $EWSDLL 
+            }
+            else {
+                "$(get-date -format yyyyMMddHHmmss):"
+                "This script requires the EWS Managed API 1.2 or later."
+                "Please download and install the current version of the EWS Managed API from"
+                "http://go.microsoft.com/fwlink/?LinkId=255472"
+                ""
+                "Exiting Script."
+                exit
 
 
-        } 
-    }
+            } 
+        }
     }
 }
 
@@ -169,17 +170,17 @@ function Invoke-HandleSSL {
     }
 }
 
-function ConvertTo-String($ipInputString){    
+function ConvertTo-String($ipInputString) {    
     $Val1Text = ""    
-    for ($clInt=0;$clInt -lt $ipInputString.length;$clInt++){    
-            $Val1Text = $Val1Text + [Convert]::ToString([Convert]::ToChar([Convert]::ToInt32($ipInputString.Substring($clInt,2),16)))    
-            $clInt++    
+    for ($clInt = 0; $clInt -lt $ipInputString.length; $clInt++) {    
+        $Val1Text = $Val1Text + [Convert]::ToString([Convert]::ToChar([Convert]::ToInt32($ipInputString.Substring($clInt, 2), 16)))    
+        $clInt++    
     }    
     return $Val1Text    
 }    
 
-function TraceHandler(){
-$sourceCode = @"
+function TraceHandler() {
+    $sourceCode = @"
     public class ewsTraceListener : Microsoft.Exchange.WebServices.Data.ITraceListener
     {
         public System.String LogFile {get;set;}
@@ -192,12 +193,12 @@ $sourceCode = @"
 
     Add-Type -TypeDefinition $sourceCode -Language CSharp -ReferencedAssemblies $Script:EWSDLL
     $TraceListener = New-Object ewsTraceListener
-   return $TraceListener
+    return $TraceListener
 
 
 }
 
-function Invoke-MailboxChangeDiscovery{
+function Invoke-MailboxChangeDiscovery {
     param( 
         [Parameter(Position = 1, Mandatory = $true)] [string]$MailboxName,
         [Parameter(Position = 2, Mandatory = $false)] [string]$url,
@@ -222,23 +223,26 @@ function Invoke-MailboxChangeDiscovery{
         $service.HttpHeaders.Add("X-AnchorMailbox", $MailboxName);
         if ($disableImpersonation.IsPresent) {
             Write-Verbose ("Impersonation is disabled")    
-        }else{
+        }
+        else {
             $service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)
         }
         $folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Root, $MailboxName)         
         $RootFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $folderid)  
         $FolderIndex = Get-SubFolders -ParentFolder $RootFolder -startdatetime $startDate
-        foreach($folder in $FolderIndex.Values){
-            if($folder.FolderType -eq 1){
-                if($folder.FolderPath -ne "\Recoverable Items\Audits"){
+        foreach ($folder in $FolderIndex.Values) {
+            if ($folder.FolderType -eq 1) {
+                if ($folder.FolderPath -ne "\Recoverable Items\Audits") {
                     Write-Verbose ("Processing Folder " + $folder.FolderPath) 
                     Invoke-ScanFolderItems -Folder $folder -startdatetime $startDate   
                     Invoke-ScanFolderItems -Folder $folder -startdatetime $startDate -FAIItems 
-                }else{
+                }
+                else {
                     Write-Verbose ("****Skipping Audits folder " + $folder.FolderPath)
                 }
 
-            }else{
+            }
+            else {
                 Write-Verbose ("****Skipping SearchFolder " + $folder.FolderPath)
             }
          
@@ -257,11 +261,11 @@ function Invoke-MailboxChangeDiscovery{
         [Parameter(Position = 3, Mandatory = $false)] [switch]$FAIItems
     )  
     Begin {    
-        $Script:ItemCount =0
+        $Script:ItemCount = 0
         $Sfgt = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsGreaterThan([Microsoft.Exchange.WebServices.Data.ItemSchema]::LastModifiedTime, $startdatetime)
         $ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000) 
         $ItemPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
-        if($FAIItems.IsPresent){
+        if ($FAIItems.IsPresent) {
             $ivItemView.Traversal = [Microsoft.Exchange.WebServices.Data.ItemTraversal]::Associated
         }
         $PR_ENTRYID = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x0FFF, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Binary) 
@@ -271,46 +275,48 @@ function Invoke-MailboxChangeDiscovery{
         do {
             try {
                 $error.Clear()
-                $fiItems = $Folder.Service.FindItems($Folder.Id,$Sfgt, $ivItemView)   
+                $fiItems = $Folder.Service.FindItems($Folder.Id, $Sfgt, $ivItemView)   
             }
             catch {
-                Write-Verbose ("Error " +$PSItem.Exception.InnerException.Message)
+                Write-Verbose ("Error " + $PSItem.Exception.InnerException.Message)
                 Invoke-ProcessEWSError -Item $PSItem
                 $error.Clear()
-                $fiItems = $Folder.Service.FindItems($Folder.Id,$Sfgt, $ivItemView)
+                $fiItems = $Folder.Service.FindItems($Folder.Id, $Sfgt, $ivItemView)
                 if ($error.Count -ne 0) {
                     $Script:ErrorCount++                    
                 }       
             }
-            foreach($Item in $fiItems.Items){
+            foreach ($Item in $fiItems.Items) {
                 $Script:ItemCount++
-                $rptObj = "" | Select FolderPath,Type,Collection,Subject,ItemClass,EntryId,DateTimeCreated,LastModifiedTime
+                $rptObj = "" | Select FolderPath, Type, Collection, Subject, ItemClass, EntryId, DateTimeCreated, LastModifiedTime
                 $rptObj.FolderPath = $Folder.FolderPath                
                 $rptObj.Subject = $Item.Subject
-                if($FAIItems.IsPresent){
+                if ($FAIItems.IsPresent) {
                     $rptObj.Collection = "FAIItem"
-                }else{
+                }
+                else {
                     $rptObj.Collection = "Messages"
                 }
                 $rptObj.ItemClass = $Item.ItemClass
                 $EntryIdValue = $null
-                if($Item.TryGetProperty($PR_ENTRYID,[ref]$EntryIdValue)){
-                    $rptObj.EntryId = [System.BitConverter]::ToString($EntryIdValue).Replace("-","")
+                if ($Item.TryGetProperty($PR_ENTRYID, [ref]$EntryIdValue)) {
+                    $rptObj.EntryId = [System.BitConverter]::ToString($EntryIdValue).Replace("-", "")
                 }                
                 $rptObj.DateTimeCreated = $Item.DateTimeCreated
                 $rptObj.LastModifiedTime = $Item.LastModifiedTime
                 Write-Verbose ("Processing Item : " + $Item.Subject)
-                if($Item.DateTimeCreated -gt $startdatetime){
+                if ($Item.DateTimeCreated -gt $startdatetime) {
                     Write-Verbose ("New Item Found")
                     $rptObj.Type = "New"
-                }else{
+                }
+                else {
                     Write-Verbose ("Modified Item Found")
                     $rptObj.Type = "Modified"
                 }
                 $Script:RptCollection += $rptObj
             }
             $ivItemView.Offset += $fiItems.Items.Count   
-            Write-Verbose ("Processed " +  $Script:ItemCount) 
+            Write-Verbose ("Processed " + $Script:ItemCount) 
         }while ($fiItems.MoreAvailable -eq $true) 
 
     }
@@ -430,27 +436,28 @@ function Get-SubFolders {
                 if ($ffFolder.TryGetProperty($PR_FOLDER_TYPE, [ref]$prop9Val)) {                    
                     Add-Member -InputObject $ffFolder -MemberType NoteProperty -Name FolderType -Value $prop9Val
                 }
-                $rptObj = "" | Select FolderPath,Type,Collection,Subject,ItemClass,EntryId,DateTimeCreated,LastModifiedTime
+                $rptObj = "" | Select FolderPath, Type, Collection, Subject, ItemClass, EntryId, DateTimeCreated, LastModifiedTime
                 $rptObj.FolderPath = $ffFolder.FolderPath   
                 $rptObj.Subject = $ffFolder.DisplayName
-                if($ffFolder.FolderType -eq 2){
+                if ($ffFolder.FolderType -eq 2) {
                     $rptObj.Collection = "SearchFolder"
                 }      
   
-                if($ffFolder.CreationTime -gt $startdatetime.ToUniversalTime()){
+                if ($ffFolder.CreationTime -gt $startdatetime.ToUniversalTime()) {
                     Write-Verbose ("New Folder Found")
                     $rptObj.Type = "New"
                     $Script:RptCollection += $rptObj
 
-                }else{
-                    if($ffFolder.CreationTime -gt $startdatetime.ToUniversalTime()){
+                }
+                else {
+                    if ($ffFolder.CreationTime -gt $startdatetime.ToUniversalTime()) {
                         Write-Verbose ("Modified Folder Found")
                         $rptObj.Type = "Modified"
                         $Script:RptCollection += $rptObj
                     }
 
                 }
-                $Folders.Add($ffFolder.Id.UniqueId,$ffFolder)              
+                $Folders.Add($ffFolder.Id.UniqueId, $ffFolder)              
             } 
             $fvFolderView.Offset += $fiResult.Folders.Count
         }while ($fiResult.MoreAvailable -eq $true)  
@@ -461,13 +468,13 @@ function Get-SubFolders {
 
 
 
-function Invoke-LoadPropertiesForItems(){
+function Invoke-LoadPropertiesForItems() {
     [CmdletBinding()] 
     param( 
         [Parameter(Position = 0, Mandatory = $true)] [PSObject]$ItemList,
         [Parameter(Position = 1, Mandatory = $true)] [Microsoft.Exchange.WebServices.Data.ExchangeService]$service,
         [Parameter(Position = 2, Mandatory = $true)] [Microsoft.Exchange.WebServices.Data.PropertySet]$DetailPropSet
-    ) Begin{
+    ) Begin {
         try {
             $error.Clear()
             [Void]$service.LoadPropertiesForItems($ItemList, $DetailPropSet)     
@@ -494,7 +501,7 @@ function Invoke-ProcessEWSError {
     Process {
         Write-Verbose $Item.Exception.InnerException.ErrorCode.ToString()
         if ($Item.Exception.InnerException -is [Microsoft.Exchange.WebServices.Data.ServiceResponseException]) {
-            switch($Item.Exception.InnerException.ErrorCode.ToString()){
+            switch ($Item.Exception.InnerException.ErrorCode.ToString()) {
                 "ErrorServerBusy" {
                     $Seconds = [Math]::Round(($Item.Exception.InnerException.BackOffMilliseconds / 1000), 0)
                     Write-Verbose ("Resume in " + $Seconds + " Seconds")
@@ -513,20 +520,20 @@ function Invoke-ProcessEWSError {
     }
 }
 
-function ConvertId{    
+function ConvertId {    
     param (
-            [Parameter(Position=1, Mandatory=$false)] [String]$HexId,
-            [Parameter(Position=2, Mandatory=$false)] [Microsoft.Exchange.WebServices.Data.ExchangeService]$service
-       )
-    process{
+        [Parameter(Position = 1, Mandatory = $false)] [String]$HexId,
+        [Parameter(Position = 2, Mandatory = $false)] [Microsoft.Exchange.WebServices.Data.ExchangeService]$service
+    )
+    process {
         $aiItem = New-Object Microsoft.Exchange.WebServices.Data.AlternateId      
         $aiItem.Mailbox = $MailboxName      
         $aiItem.UniqueId = $HexId   
         $aiItem.Format = [Microsoft.Exchange.WebServices.Data.IdFormat]::HexEntryId      
         $convertedId = $service.ConvertId($aiItem, [Microsoft.Exchange.WebServices.Data.IdFormat]::EwsId) 
-     return $convertedId.UniqueId
+        return $convertedId.UniqueId
     }
-   }
+}
 
 
 function ConvertToString($ipInputString) {  
@@ -630,8 +637,7 @@ function Get-EWSAccessToken {
                 $Prompt = "refresh_session"
             }
         
-            $Phase1auth = Show-OAuthWindow -Url "https://login.microsoftonline.com/common/oauth2/authorize?resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&response_type=code&redirect_uri=$redirectUrl&prompt=$Prompt&domain_hint=organizations"
-            $code = $Phase1auth["code"]
+            $code = Show-OAuthWindow -Url "https://login.microsoftonline.com/common/oauth2/authorize?resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&response_type=code&redirect_uri=$redirectUrl&prompt=$Prompt&domain_hint=organizations&response_mode=form_post"
             $AuthorizationPostRequest = "resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&grant_type=authorization_code&code=$code&redirect_uri=$redirectUrl"
             if (![String]::IsNullOrEmpty($ClientSecret)) {
                 $AuthorizationPostRequest = "resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&client_secret=$ClientSecret&grant_type=authorization_code&code=$code&redirect_uri=$redirectUrl"
@@ -658,6 +664,7 @@ function Get-EWSAccessToken {
         }
     }
 }
+
 function Show-OAuthWindow {
     [CmdletBinding()]
     param (
@@ -675,21 +682,24 @@ function Show-OAuthWindow {
 
     $form = New-Object -TypeName System.Windows.Forms.Form -Property @{ Width = 440; Height = 640 }
     $web = New-Object -TypeName System.Windows.Forms.WebBrowser -Property @{ Width = 420; Height = 600; Url = ($url) }
-    $DocComp = {
-        $Global:uri = $web.Url.AbsoluteUri
-        if ($Global:Uri -match "error=[^&]*|code=[^&]*") { $form.Close() }
+    $Navigated = {
+   
+        $formElements = $web.Document.GetElementsByTagName("input");  
+        foreach ($element in $formElements) {
+            if ($element.Name -eq "code") {
+                $Script:oAuthCode = $element.GetAttribute("value");
+                Write-Verbose $Script:oAuthCode
+                $form.Close();
+            }
+        }   
     }
+    
     $web.ScriptErrorsSuppressed = $true
-    $web.Add_DocumentCompleted($DocComp)
+    $web.Add_Navigated($Navigated)
     $form.Controls.Add($web)
     $form.Add_Shown( { $form.Activate() })
     $form.ShowDialog() | Out-Null
-    $queryOutput = [System.Web.HttpUtility]::ParseQueryString($web.Url.Query)
-    $output = @{ }
-    foreach ($key in $queryOutput.Keys) {
-        $output["$key"] = $queryOutput[$key]
-    }
-    return $output
+    return $Script:oAuthCode
 }
 
 function Get-ProtectedToken {

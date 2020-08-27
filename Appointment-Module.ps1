@@ -273,6 +273,9 @@ function Get-FolderFromPath {
     }
 }
 
+
+
+
 function Get-ItemFromSubject {
     param (
         [Parameter(Position = 0, Mandatory = $true)] [Microsoft.Exchange.WebServices.Data.Folder]$Folder,

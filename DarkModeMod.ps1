@@ -484,9 +484,8 @@ function Get-EWSAccessToken {
                 $Prompt = "refresh_session"
             }
         
-            $Phase1auth = Show-OAuthWindow -Url "https://login.microsoftonline.com/common/oauth2/authorize?resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&response_type=code&redirect_uri=$redirectUrl&prompt=$Prompt&domain_hint=organizations"
-            $code = $Phase1auth["code"]
-            $AuthorizationPostRequest = "resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&grant_type=authorization_code&code=$code&redirect_uri=$redirectUrl"
+            $code = Show-OAuthWindow -Url "https://login.microsoftonline.com/common/oauth2/authorize?resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&response_type=code&redirect_uri=$redirectUrl&prompt=$Prompt&domain_hint=organizations&response_mode=form_post"
+             $AuthorizationPostRequest = "resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&grant_type=authorization_code&code=$code&redirect_uri=$redirectUrl"
             if (![String]::IsNullOrEmpty($ClientSecret)) {
                 $AuthorizationPostRequest = "resource=https%3A%2F%2F$ResourceURL&client_id=$ClientId&client_secret=$ClientSecret&grant_type=authorization_code&code=$code&redirect_uri=$redirectUrl"
             }
@@ -529,21 +528,23 @@ function Show-OAuthWindow {
 
     $form = New-Object -TypeName System.Windows.Forms.Form -Property @{ Width = 440; Height = 640 }
     $web = New-Object -TypeName System.Windows.Forms.WebBrowser -Property @{ Width = 420; Height = 600; Url = ($url) }
-    $DocComp = {
-        $Global:uri = $web.Url.AbsoluteUri
-        if ($Global:Uri -match "error=[^&]*|code=[^&]*") { $form.Close() }
+    $Navigated = {
+   
+	$formElements = $web.Document.GetElementsByTagName("input");  
+        foreach($element in $formElements){
+		if($element.Name -eq "code"){
+			$Script:oAuthCode = $element.GetAttribute("value");
+			$form.Close();
+		}
+	}   
     }
+    
     $web.ScriptErrorsSuppressed = $true
-    $web.Add_DocumentCompleted($DocComp)
+    $web.Add_Navigated($Navigated)
     $form.Controls.Add($web)
     $form.Add_Shown( { $form.Activate() })
     $form.ShowDialog() | Out-Null
-    $queryOutput = [System.Web.HttpUtility]::ParseQueryString($web.Url.Query)
-    $output = @{ }
-    foreach ($key in $queryOutput.Keys) {
-        $output["$key"] = $queryOutput[$key]
-    }
-    return $output
+    return $Script:oAuthCode
 }
 
 function Get-ProtectedToken {

@@ -279,7 +279,7 @@ function Invoke-RejectModerationRequest{
                         },
                         @{
                             id = "String 0x001A"
-                            value = "IPM.Note.Microsoft.Approval.Reply.Approve"
+                            value = "IPM.Note.Microsoft.Approval.Reply.Reject"
                         },
                         @{
                             id = "String {00062008-0000-0000-C000-000000000046} Id 0x8524"

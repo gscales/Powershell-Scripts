@@ -303,32 +303,7 @@ function Invoke-RejectModerationRequest{
     }
 }
 
-function Invoke-DeleteMessage{
-    [CmdletBinding()]
-    param (
-	
-        [Parameter(Position = 1, Mandatory = $true)]
-        [String]
-        $MailboxName,
-        [Parameter(Position = 2, Mandatory = $false)]
-        [String]
-        $AccessToken,
-        [Parameter(Position = 3, Mandatory = $false)]
-        [psobject]
-        $ApprovalMail
-    )
-    Process{
-        $EndPoint = "https://graph.microsoft.com/v1.0/users"
-        $RequestURL =  $EndPoint + "('$MailboxName')/messages/" + $ApprovalMail.id + "/move"
-        $headers = @{
-            'Authorization' = "Bearer $AccessToken"
-            'AnchorMailbox' = "$MailboxName"
-        }
-        $MessageMoveRequest = "{`"destinationId`": `"deleteditems`"}"
-        return (Invoke-RestMethod -Method Post -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers -ContentType 'Application/json' -Body $MessageMoveRequest).value
 
-    }
-}
 
 
 function Get-TaggedProperty {

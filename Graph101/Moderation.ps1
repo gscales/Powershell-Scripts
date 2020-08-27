@@ -158,7 +158,7 @@ function Invoke-ApproveModerationRequest{
         $AccessToken,
         [Parameter(Position = 7, Mandatory = $false)]
         [psobject]
-        $ApprovalMail,
+        $ApprovalMail
 
     )
 
@@ -198,6 +198,92 @@ function Invoke-ApproveModerationRequest{
                         @{
                             id = "String {00062008-0000-0000-C000-000000000046} Id 0x8524"
                             value = "Approve"
+                        }
+                    )
+    
+                }
+            }
+            $MessageToSend = ConvertTo-Json -InputObject $SendRequest -Depth 9 
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+            }
+            return (Invoke-RestMethod -Method Post -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers -ContentType 'Application/json' -Body $MessageToSend)
+        }else{
+            return "No Moderation Messages Found"
+        }
+
+
+    }
+}
+
+function Invoke-RejectModerationRequest{
+    [CmdletBinding()]
+    param (
+	
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $scopes = "User.Read.All Mail.Read",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,	
+        [Parameter(Position = 5, Mandatory = $false)]
+        [Int32]
+        $Top=1,
+        [Parameter(Position = 6, Mandatory = $false)]
+        [String]
+        $AccessToken,
+        [Parameter(Position = 7, Mandatory = $false)]
+        [psobject]
+        $ApprovalMail
+
+    )
+
+    process {
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
+        $EndPoint = "https://graph.microsoft.com/v1.0/users"
+        if($ApprovalMail -eq $null){            
+            if([String]::IsNullOrEmpty($AccessToken)){
+                $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+            }
+            $ApprovalMail =  Get-ModerationRequests -MailboxName $MailboxName -AccessToken $AccessToken
+        }
+        if($ApprovalMail){
+            $RequestURL =  $EndPoint + "('$MailboxName')/SendMail"
+            $SendRequest = [ordered]@{
+                message = @{
+                    subject = "Approve: " + $ApprovalMail.singleValueExtendedProperties[1].value
+                    toRecipients = @(
+                            @{
+                                emailAddress = @{
+                                        address = $ApprovalMail.sender.emailAddress.address                            
+                                }
+                            }
+                   ) 
+                    singleValueExtendedProperties = @(
+                        @{
+                            id = "Binary 0x31"
+                            value =  $ApprovalMail.singleValueExtendedProperties[0].value
+                        },
+                        @{
+                            id = "String 0x001A"
+                            value = "IPM.Note.Microsoft.Approval.Reply.Approve"
+                        },
+                        @{
+                            id = "String {00062008-0000-0000-C000-000000000046} Id 0x8524"
+                            value = "Reject"
                         }
                     )
     

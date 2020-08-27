@@ -158,7 +158,8 @@ function Invoke-ApproveModerationRequest{
         $AccessToken,
         [Parameter(Position = 7, Mandatory = $false)]
         [psobject]
-        $ApprovalMail
+        $ApprovalMail,
+
     )
 
     process {
@@ -173,44 +174,76 @@ function Invoke-ApproveModerationRequest{
             }
             $ApprovalMail =  Get-ModerationRequests -MailboxName $MailboxName -AccessToken $AccessToken
         }
-        $RequestURL =  $EndPoint + "('$MailboxName')/SendMail"
-        $SendRequest = [ordered]@{
-            message = @{
-                subject = "Approve: " + $ApprovalMail.singleValueExtendedProperties[1].value
-                toRecipients = @(
-                        @{
-                            emailAddress = @{
-                                    address = $ApprovalMail.sender.emailAddress.address                            
+        if($ApprovalMail){
+            $RequestURL =  $EndPoint + "('$MailboxName')/SendMail"
+            $SendRequest = [ordered]@{
+                message = @{
+                    subject = "Approve: " + $ApprovalMail.singleValueExtendedProperties[1].value
+                    toRecipients = @(
+                            @{
+                                emailAddress = @{
+                                        address = $ApprovalMail.sender.emailAddress.address                            
+                                }
                             }
+                   ) 
+                    singleValueExtendedProperties = @(
+                        @{
+                            id = "Binary 0x31"
+                            value =  $ApprovalMail.singleValueExtendedProperties[0].value
+                        },
+                        @{
+                            id = "String 0x001A"
+                            value = "IPM.Note.Microsoft.Approval.Reply.Approve"
+                        },
+                        @{
+                            id = "String {00062008-0000-0000-C000-000000000046} Id 0x8524"
+                            value = "Approve"
                         }
-               ) 
-                singleValueExtendedProperties = @(
-                    @{
-                        id = "Binary 0x31"
-                        value =  $ApprovalMail.singleValueExtendedProperties[0].value
-                    },
-                    @{
-                        id = "String 0x001A"
-                        value = "IPM.Note.Microsoft.Approval.Reply.Approve"
-                    },
-                    @{
-                        id = "String {00062008-0000-0000-C000-000000000046} Id 0x8524"
-                        value = "Approve"
-                    }
-                )
-
+                    )
+    
+                }
             }
+            $MessageToSend = ConvertTo-Json -InputObject $SendRequest -Depth 9 
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+            }
+            return (Invoke-RestMethod -Method Post -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers -ContentType 'Application/json' -Body $MessageToSend)
+        }else{
+            return "No Moderation Messages Found"
         }
-        $MessageToSend = ConvertTo-Json -InputObject $SendRequest -Depth 9 
-        $headers = @{
-            'Authorization' = "Bearer $AccessToken"
-            'AnchorMailbox' = "$MailboxName"
-        }
-        return (Invoke-RestMethod -Method Post -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers -ContentType 'Application/json' -Body $MessageToSend).value
 
 
     }
 }
+
+function Invoke-DeleteMessage{
+    [CmdletBinding()]
+    param (
+	
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $AccessToken,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [psobject]
+        $ApprovalMail
+    )
+    Process{
+        $EndPoint = "https://graph.microsoft.com/v1.0/users"
+        $RequestURL =  $EndPoint + "('$MailboxName')/messages/" + $ApprovalMail.id + "/move"
+        $headers = @{
+            'Authorization' = "Bearer $AccessToken"
+            'AnchorMailbox' = "$MailboxName"
+        }
+        $MessageMoveRequest = "{`"destinationId`": `"deleteditems`"}"
+        return (Invoke-RestMethod -Method Post -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers -ContentType 'Application/json' -Body $MessageMoveRequest).value
+
+    }
+}
+
 
 function Get-TaggedProperty {
     [CmdletBinding()]

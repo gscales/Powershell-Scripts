@@ -131,7 +131,167 @@ function Invoke-CreateCategorySearchFolder {
     }
 }
 
+function Invoke-CreateSearchFolder {
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $scopes = "User.Read.All Mail.Read",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,
+        [Parameter(Position = 6, Mandatory = $true)]
+        [String]
+        $SearchFolderName,	
+        [Parameter(Position = 7, Mandatory = $true)]
+        [String]
+        $Filter		
+    )
 
+    process {
+        
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
+        $EndPoint = "https://graph.microsoft.com/v1.0/users"
+        $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('SearchFolders')/childfolders"
+        $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        $JsonBody = @"
+{
+    "@odata.type": "microsoft.graph.mailSearchFolder",
+    "displayName": "$SearchFolderName",
+    "includeNestedFolders": true,
+    "sourceFolderIds": ["MsgFolderRoot"],
+    "filterQuery": "$Filter"
+}
+"@
+        $headers = @{
+            'Authorization' = "Bearer $AccessToken"
+            'AnchorMailbox' = "$MailboxName"
+        }
+        return (Invoke-RestMethod -Method POST -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers -Body $JsonBody -ContentType "application/json" )  
+ 
+    }
+}
+
+function Get-SearchFolders {
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $false)]
+		[psobject]
+        $AccessToken,   
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $scopes = "User.Read.All Mail.Read",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,
+        [Parameter(Position = 6, Mandatory = $false)]
+        [String]
+        $Filter 
+
+    )
+
+    process {        
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
+        $EndPoint = "https://graph.microsoft.com/v1.0/users"
+        $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('SearchFolders')/childfolders?`$Top=999"
+        if(![String]::IsNullOrEmpty($Filter)){
+            $RequestURL += "&`$Filter=" + $Filter
+        }
+        if([String]::IsNullOrEmpty($AccessToken)){
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        }  
+		do
+		{
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+            }
+            $Folders = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers).value  
+			foreach ($Folder in $Folders)
+			{				
+				Write-Output $Folder
+    		}
+			$RequestURL = $JSONOutput.'@odata.nextLink'
+        }
+        while (![String]::IsNullOrEmpty($RequestURL))          
+ 
+    }
+}
+
+function Invoke-RemoveSearchFolder {
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $scopes = "User.Read.All Mail.Read",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,
+        [Parameter(Position = 6, Mandatory = $true)]
+        [String]
+        $SearchFolderName	
+    )
+
+    process {
+        if([String]::IsNullOrEmpty($SearchFolderName)){throw "Search FolderName can't be blank"}
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
+        $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        $Folder = Get-SearchFolders -MailboxName $MailboxName -Filter "displayName eq '$SearchFolderName'" -AccessToken $AccessToken
+        $headers = @{
+            'Authorization' = "Bearer $AccessToken"
+            'AnchorMailbox' = "$MailboxName"
+        }
+        if($Folder.displayName -eq $SearchFolderName){
+            $EndPoint = "https://graph.microsoft.com/v1.0/users"
+            if(![String]::IsNullOrEmpty($Folder.id)){
+                $RequestURL = $EndPoint + "('$MailboxName')/MailFolders/" + $Folder.id
+                return (Invoke-RestMethod -Method Delete -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers)   
+            }else{
+                throw "Folder Id invalid"
+            }
+          
+        }else{
+            Write-Host "No Folder Found"
+        }
+
+    }
+}
 
 function Get-FolderFromPath {
     [CmdletBinding()]

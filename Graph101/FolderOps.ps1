@@ -139,6 +139,7 @@ function Get-FolderFromPath {
         }
         if ($tfTargetFolder.singleValueExtendedProperties) {
             foreach ($Prop in $tfTargetFolder.singleValueExtendedProperties) {
+                Write-Verbose $Prop.Id
                 Switch ($Prop.Id) {
                     "Long 0x66b3" {      
                         $tfTargetFolder | Add-Member -NotePropertyName "FolderSize" -NotePropertyValue $Prop.value 
@@ -147,12 +148,140 @@ function Get-FolderFromPath {
                         $tfTargetFolder | Add-Member -NotePropertyName "PR_ENTRYID" -NotePropertyValue ([System.BitConverter]::ToString([Convert]::FromBase64String($Prop.Value)).Replace("-", ""))
                         $tfTargetFolder | Add-Member -NotePropertyName "ComplianceSearchId" -NotePropertyValue ("folderid:" + $tfTargetFolder.PR_ENTRYID.SubString(($tfTargetFolder.PR_ENTRYID.length - 48)))
                     }
+                    "Binary {00062004-0000-0000-c000-000000000046} Name FromFavoriteSendersFolderEntryId"  {
+                        $tfTargetFolder | Add-Member -NotePropertyName "FromFavoriteSendersFolderEntryId" -NotePropertyValue ([System.BitConverter]::ToString([Convert]::FromBase64String($Prop.Value)).Replace("-", ""))
+                    }
                 }
             }
         }
         return $tfTargetFolder 
     }
 }
+
+function Get-WellKnownFolder {
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]
+        $FolderName,		
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $scopes = "User.Read.All Mail.Read",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,
+        [Parameter(Position = 6, Mandatory = $false)]
+        [psobject]
+        $PropList,
+        [Parameter(Position = 7, Mandatory = $false)]
+        [String]
+        $AccessToken		
+    )
+
+    process {
+        
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
+        $EndPoint = "https://graph.microsoft.com/v1.0/users"
+        $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('$FolderName')?"
+        if(!$AccessToken){
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        }       
+        if(!$PropList){
+            $PropList = @()
+        }        
+        $FolderSizeProp = Get-TaggedProperty -DataType "Long" -Id "0x66b3"
+        $EntryId = Get-TaggedProperty -DataType "Binary" -Id "0xfff"
+        $PropList += $FolderSizeProp 
+        $PropList += $EntryId
+        $Props = Get-ExtendedPropList -PropertyList $PropList 
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+            }
+        $RequestURL += "`$expand=SingleValueExtendedProperties(`$filter=" + $Props + ")"
+        $tfTargetFolder = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers)  
+        if ($tfTargetFolder.singleValueExtendedProperties) {
+            foreach ($Prop in $tfTargetFolder.singleValueExtendedProperties) {
+                Switch ($Prop.Id) {
+                    "Long 0x66b3" {      
+                        $tfTargetFolder | Add-Member -NotePropertyName "FolderSize" -NotePropertyValue $Prop.value 
+                    }
+                    "Binary 0xfff" {
+                        $tfTargetFolder | Add-Member -NotePropertyName "PR_ENTRYID" -NotePropertyValue ([System.BitConverter]::ToString([Convert]::FromBase64String($Prop.Value)).Replace("-", ""))
+                        $tfTargetFolder | Add-Member -NotePropertyName "ComplianceSearchId" -NotePropertyValue ("folderid:" + $tfTargetFolder.PR_ENTRYID.SubString(($tfTargetFolder.PR_ENTRYID.length - 48)))
+                    }
+                 
+                }
+            }
+        }
+        return $tfTargetFolder 
+    }
+}
+
+
+function Get-ApplicationFolder{
+        [CmdletBinding()]
+        param (
+           
+            [Parameter(Position = 1, Mandatory = $true)]
+            [String]
+            $MailboxName,
+            [Parameter(Position = 2, Mandatory = $false)]
+            [String]
+            $ClientId,
+            [Parameter(Position = 3, Mandatory = $false)]
+            [String]
+            $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+            [Parameter(Position = 4, Mandatory = $false)]
+            [String]
+            $scopes = "User.Read.All Mail.Read",
+            [Parameter(Position = 5, Mandatory = $false)]
+            [switch]
+            $AutoPrompt,
+            [Parameter(Position = 6, Mandatory = $false)]
+            [psobject]
+            $PropList		
+        )
+    
+        process {
+            
+            $prompt = $true
+            if($AutoPrompt.IsPresent){
+                $prompt = $false
+            }
+            $appId = $Proplist[0].Id
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+            $RootFolder = Get-WellKnownFolder -MailboxName $MailboxName -FolderName root -PropList $PropList -AccessToken $AccessToken
+            foreach ($Prop in $RootFolder.singleValueExtendedProperties) {
+                if($Prop.Id -match $PropList[0].Id){
+                    $RootFolder | Add-Member -NotePropertyName $PropList[0].Id -NotePropertyValue ([System.BitConverter]::ToString([Convert]::FromBase64String($Prop.Value)).Replace("-", ""))   
+                }
+            }
+            $FolderId = Invoke-TranslateExchangeIds -SourceHexId $RootFolder."$appId" -SourceFormat entryid -TargetFormat restid -AccessToken $AccessToken -MailboxName $MailboxName
+            $EndPoint = "https://graph.microsoft.com/v1.0/users"
+            $RequestURL = $EndPoint + "('$MailboxName')/MailFolders/" + $FolderId
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+            }           
+            $tfTargetFolder = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers)  
+            return $tfTargetFolder
+        }
+        
+}
+
 
 function Get-TaggedProperty {
     [CmdletBinding()]
@@ -181,6 +310,52 @@ function Get-TaggedProperty {
     }
 }
 
+function Get-NamedProperty
+{
+	[CmdletBinding()]
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[String]
+		$DataType,
+		
+		[Parameter(Position = 1, Mandatory = $true)]
+		[String]
+		$Id,
+		
+		[Parameter(Position = 1, Mandatory = $true)]
+		[String]
+		$Guid,
+		
+		[Parameter(Position = 1, Mandatory = $true)]
+		[String]
+		$Type,
+		
+		[Parameter(Position = 2, Mandatory = $false)]
+		[String]
+		$Value
+	)
+	Begin
+	{
+		$Property = "" | Select-Object Id, DataType, PropertyType, Type, Guid, Value
+		$Property.Id = $Id
+		$Property.DataType = $DataType
+		$Property.PropertyType = "Named"
+		$Property.Guid = $Guid
+		if ($Type -eq "String")
+		{
+			$Property.Type = "String"
+		}
+		else
+		{
+			$Property.Type = "Id"
+		}
+		if (![String]::IsNullOrEmpty($Value))
+		{
+			$Property.Value = $Value
+		}
+		return, $Property
+	}
+}
 
 function Get-ExtendedPropList {
     [CmdletBinding()]
@@ -226,4 +401,81 @@ function Get-ExtendedPropList {
     }
 }
 
+function Invoke-TranslateExchangeIds {
+    [CmdletBinding()]
+    param (     
+        [Parameter(Position = 1, Mandatory = $false)]
+        [String]
+        $MailboxName, 
+
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $SourceId, 
+        
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $SourceHexId,
+        
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $SourceEMSId,
+
+        [Parameter(Position = 5, Mandatory = $false)]
+        [String]
+        $SourceFormat,  
+
+        [Parameter(Position = 6, Mandatory = $false)]
+        [String]
+        $TargetFormat,       
+        
+        [Parameter(Position = 7, Mandatory = $false)]
+        [String]
+        $AccessToken  
+    )
+    Begin {		
+
+        $ConvertRequest = @{}
+        $ConvertRequest.Add("inputIds", @())
+        if ($SourceHexId) {
+            $byteArray = @($SourceHexId -split '([a-f0-9]{2})' | foreach-object { if ($_) {[System.Convert]::ToByte($_, 16)}})
+            $urlSafeString = [Convert]::ToBase64String($byteArray).replace("/", "_").replace("+", "-")
+            if ($urlSafeString.contains("==")) {$urlSafeString = $urlSafeString.replace("==", "2")}
+            $ConvertRequest["inputIds"] += $urlSafeString
+
+        }
+        else {
+            if ($SourceEMSId) {
+                $HexEntryId = [System.BitConverter]::ToString([Convert]::FromBase64String($SourceEMSId)).Replace("-", "").Substring(2)  
+                $HexEntryId = $HexEntryId.SubString(0, ($HexEntryId.Length - 2))
+                $byteArray = @($HexEntryId -split '([a-f0-9]{2})' | foreach-object { if ($_) {[System.Convert]::ToByte($_, 16)}})
+                $urlSafeString = [Convert]::ToBase64String($byteArray).replace("/", "_").replace("+", "-")
+                if ($urlSafeString.contains("==")) {$urlSafeString = $urlSafeString.replace("==", "2")}
+                $ConvertRequest["inputIds"] += $urlSafeString
+            }
+            else {
+                $ConvertRequest["inputIds"] += $SourceId
+            }
+
+        }        
+        $ConvertRequest.targetIdType = $TargetFormat
+        $ConvertRequest.sourceIdType = $SourceFormat
+        $headers = @{
+            'Authorization' = "Bearer $AccessToken"
+            'AnchorMailbox' = "$MailboxName"
+        }      
+        $JsonResult = Invoke-RestMethod -Headers $headers -Uri ("https://graph.microsoft.com/v1.0/users('$MailboxName')/translateExchangeIds") -Method Post -ContentType "application/json" -Body (ConvertTo-Json $ConvertRequest -Depth 9)
+        if($TargetFormat.ToLower() -eq "entryid"){
+            $urldecodedstring = $JsonResult.value.targetId.replace("_", "/").replace("-", "+")
+            $lastVal = $urldecodedstring.SubString($urldecodedstring.Length-1,1);
+            if($lastVal -eq "2"){
+                $urldecodedstring = $urldecodedstring.SubString(0,$urldecodedstring.Length-1) + "=="
+            }
+            return ([System.BitConverter]::ToString([Convert]::FromBase64String($urldecodedstring))).replace("-","")
+        }else{
+            return  $JsonResult.value.targetId
+        }
+       	
+		
+    }
+}
 

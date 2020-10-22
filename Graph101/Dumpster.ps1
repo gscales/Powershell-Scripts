@@ -593,8 +593,7 @@ function Get-AllMailFolders{
 	param (
 		[Parameter(Position = 0, Mandatory = $false)]
 		[string]
-		$MailboxName,
-		
+		$MailboxName,		
 		[Parameter(Position = 1, Mandatory = $false)]
 		[psobject]
         $AccessToken,        

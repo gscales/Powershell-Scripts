@@ -205,7 +205,8 @@ function Invoke-MailboxChangeDiscovery {
         [Parameter(Position = 3, Mandatory = $false)] [switch]$disableImpersonation,
         [Parameter(Position = 4, Mandatory = $false)] [switch]$basicAuth,
         [Parameter(Position = 5, Mandatory = $false)] [System.Management.Automation.PSCredential]$Credentials,
-        [Parameter(Position = 6, Mandatory = $true)] [Int32]$secondstolookback       
+        [Parameter(Position = 6, Mandatory = $true)] [Int32]$secondstolookback,
+        [Parameter(Position = 7, Mandatory = $false)] [switch]$getJsonMetaData       
     )  
     Process {
         $Script:ItemCount = 0    
@@ -234,8 +235,8 @@ function Invoke-MailboxChangeDiscovery {
             if ($folder.FolderType -eq 1) {
                 if ($folder.FolderPath -ne "\Recoverable Items\Audits") {
                     Write-Verbose ("Processing Folder " + $folder.FolderPath) 
-                    Invoke-ScanFolderItems -Folder $folder -startdatetime $startDate   
-                    Invoke-ScanFolderItems -Folder $folder -startdatetime $startDate -FAIItems 
+                    Invoke-ScanFolderItems -Folder $folder -startdatetime $startDate  -getJsonMetaData:$getJsonMetaData.IsPresent 
+                    Invoke-ScanFolderItems -Folder $folder -startdatetime $startDate -FAIItems -getJsonMetaData:$getJsonMetaData.IsPresent
                 }
                 else {
                     Write-Verbose ("****Skipping Audits folder " + $folder.FolderPath)
@@ -258,7 +259,8 @@ function Invoke-MailboxChangeDiscovery {
         [Parameter(Position = 0, Mandatory = $true)] [Microsoft.Exchange.WebServices.Data.Folder]$Folder,
         [Parameter(Position = 1, Mandatory = $false)] [String]$MailboxName,
         [Parameter(Position = 2, Mandatory = $false)] [DateTime]$startdatetime,
-        [Parameter(Position = 3, Mandatory = $false)] [switch]$FAIItems
+        [Parameter(Position = 3, Mandatory = $false)] [switch]$FAIItems,
+        [Parameter(Position = 4, Mandatory = $false)] [switch]$getJsonMetaData   
     )  
     Begin {    
         $Script:ItemCount = 0
@@ -269,6 +271,12 @@ function Invoke-MailboxChangeDiscovery {
             $ivItemView.Traversal = [Microsoft.Exchange.WebServices.Data.ItemTraversal]::Associated
         }
         $PR_ENTRYID = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition(0x0FFF, [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::Binary) 
+        if($getJsonMetaData.IsPresent){
+            $RawJSON = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition([Guid]::Parse("2842957E-8ED9-439B-99B5-F681924BD972"),"RawJSON", [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::String) 
+            $Data = new-object Microsoft.Exchange.WebServices.Data.ExtendedPropertyDefinition([Guid]::Parse("3C896DED-22C5-450F-91F6-3D1EF0848F6E"),"Data", [Microsoft.Exchange.WebServices.Data.MapiPropertyType]::String) 
+            $ItemPropset.Add($RawJSON)
+            $ItemPropset.Add($Data)
+        }
         $ItemPropset.Add($PR_ENTRYID)
         $ivItemView.PropertySet = $ItemPropset
         $fiItems = $null    
@@ -286,34 +294,46 @@ function Invoke-MailboxChangeDiscovery {
                     $Script:ErrorCount++                    
                 }       
             }
-            foreach ($Item in $fiItems.Items) {
-                $Script:ItemCount++
-                $rptObj = "" | Select FolderPath, Type, Collection, Subject, ItemClass, EntryId, DateTimeCreated, LastModifiedTime
-                $rptObj.FolderPath = $Folder.FolderPath                
-                $rptObj.Subject = $Item.Subject
-                if ($FAIItems.IsPresent) {
-                    $rptObj.Collection = "FAIItem"
+            if($fiItems.Items.Count -gt 0){       
+                write-verbose ("LoadPropertiesForItems")         
+                $Items = Invoke-LoadPropertiesForItems -ItemList $fiItems.Items -service $Folder.Service -DetailPropSet $ItemPropset
+                foreach ($Item in $Items) {
+                    $Script:ItemCount++
+                    $rptObj = "" | Select FolderPath, Type, Collection, Subject, ItemClass, EntryId, DateTimeCreated, LastModifiedTime,RawJSON,DataProp
+                    $rptObj.FolderPath = $Folder.FolderPath                
+                    $rptObj.Subject = $Item.Subject
+                    if ($FAIItems.IsPresent) {
+                        $rptObj.Collection = "FAIItem"
+                    }
+                    else {
+                        $rptObj.Collection = "Messages"
+                    }
+                    $rptObj.ItemClass = $Item.ItemClass
+                    $EntryIdValue = $null
+                    if ($Item.TryGetProperty($PR_ENTRYID, [ref]$EntryIdValue)) {
+                        $rptObj.EntryId = [System.BitConverter]::ToString($EntryIdValue).Replace("-", "")
+                    }                
+                    $rptObj.DateTimeCreated = $Item.DateTimeCreated
+                    $rptObj.LastModifiedTime = $Item.LastModifiedTime
+                    Write-Verbose ("Processing Item : " + $Item.Subject)
+                    if ($Item.DateTimeCreated -gt $startdatetime) {
+                        Write-Verbose ("New Item Found")
+                        $rptObj.Type = "New"
+                    }
+                    else {
+                        Write-Verbose ("Modified Item Found")
+                        $rptObj.Type = "Modified"
+                    }
+                    $RawJSONValue = $null
+                    if($Item.TryGetProperty($RawJSON,[ref]$RawJSONValue)){
+                        $rptObj.RawJSON = $RawJSONValue
+                    }
+                    $RawDataValue = $null
+                    if($Item.TryGetProperty($Data,[ref]$RawDataValue)){
+                        $rptObj.DataProp = $RawDataValue 
+                    }
+                    $Script:RptCollection += $rptObj
                 }
-                else {
-                    $rptObj.Collection = "Messages"
-                }
-                $rptObj.ItemClass = $Item.ItemClass
-                $EntryIdValue = $null
-                if ($Item.TryGetProperty($PR_ENTRYID, [ref]$EntryIdValue)) {
-                    $rptObj.EntryId = [System.BitConverter]::ToString($EntryIdValue).Replace("-", "")
-                }                
-                $rptObj.DateTimeCreated = $Item.DateTimeCreated
-                $rptObj.LastModifiedTime = $Item.LastModifiedTime
-                Write-Verbose ("Processing Item : " + $Item.Subject)
-                if ($Item.DateTimeCreated -gt $startdatetime) {
-                    Write-Verbose ("New Item Found")
-                    $rptObj.Type = "New"
-                }
-                else {
-                    Write-Verbose ("Modified Item Found")
-                    $rptObj.Type = "Modified"
-                }
-                $Script:RptCollection += $rptObj
             }
             $ivItemView.Offset += $fiItems.Items.Count   
             Write-Verbose ("Processed " + $Script:ItemCount) 
@@ -436,7 +456,7 @@ function Get-SubFolders {
                 if ($ffFolder.TryGetProperty($PR_FOLDER_TYPE, [ref]$prop9Val)) {                    
                     Add-Member -InputObject $ffFolder -MemberType NoteProperty -Name FolderType -Value $prop9Val
                 }
-                $rptObj = "" | Select FolderPath, Type, Collection, Subject, ItemClass, EntryId, DateTimeCreated, LastModifiedTime
+                $rptObj = "" | Select FolderPath, Type, Collection, Subject, ItemClass, EntryId, DateTimeCreated, LastModifiedTime,RawJSON,DataProp
                 $rptObj.FolderPath = $ffFolder.FolderPath   
                 $rptObj.Subject = $ffFolder.DisplayName
                 if ($ffFolder.FolderType -eq 2) {
@@ -488,7 +508,7 @@ function Invoke-LoadPropertiesForItems() {
                 $Script:ErrorCount ++
             }     
         }
-        return, $ItemList    
+        return ,$ItemList       
     }
 }
 

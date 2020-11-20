@@ -231,6 +231,78 @@ function Get-WellKnownFolder {
 }
 
 
+function Get-FolderFromId {
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]
+        $FolderId,		
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $scopes = "User.Read.All Mail.Read",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,
+        [Parameter(Position = 6, Mandatory = $false)]
+        [psobject]
+        $PropList,
+        [Parameter(Position = 7, Mandatory = $false)]
+        [String]
+        $AccessToken		
+    )
+
+    process {
+        
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
+        $EndPoint = "https://graph.microsoft.com/v1.0/users"
+        $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('$FolderName')?"
+        if(!$AccessToken){
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        }       
+        if(!$PropList){
+            $PropList = @()
+        }        
+        $FolderSizeProp = Get-TaggedProperty -DataType "Long" -Id "0x66b3"
+        $EntryId = Get-TaggedProperty -DataType "Binary" -Id "0xfff"
+        $PropList += $FolderSizeProp 
+        $PropList += $EntryId
+        $Props = Get-ExtendedPropList -PropertyList $PropList 
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+            }
+        $RequestURL += "`$expand=SingleValueExtendedProperties(`$filter=" + $Props + ")"
+        $tfTargetFolder = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers)  
+        if ($tfTargetFolder.singleValueExtendedProperties) {
+            foreach ($Prop in $tfTargetFolder.singleValueExtendedProperties) {
+                Switch ($Prop.Id) {
+                    "Long 0x66b3" {      
+                        $tfTargetFolder | Add-Member -NotePropertyName "FolderSize" -NotePropertyValue $Prop.value 
+                    }
+                    "Binary 0xfff" {
+                        $tfTargetFolder | Add-Member -NotePropertyName "PR_ENTRYID" -NotePropertyValue ([System.BitConverter]::ToString([Convert]::FromBase64String($Prop.Value)).Replace("-", ""))
+                        $tfTargetFolder | Add-Member -NotePropertyName "ComplianceSearchId" -NotePropertyValue ("folderid:" + $tfTargetFolder.PR_ENTRYID.SubString(($tfTargetFolder.PR_ENTRYID.length - 48)))
+                    }
+                 
+                }
+            }
+        }
+        return $tfTargetFolder 
+    }
+}
+
 function Get-ApplicationFolder{
         [CmdletBinding()]
         param (
@@ -263,7 +335,7 @@ function Get-ApplicationFolder{
             }
             $appId = $Proplist[0].Id
             $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
-            $RootFolder = Get-WellKnownFolder -MailboxName $MailboxName -FolderName root -PropList $PropList -AccessToken $AccessToken
+            $RootFolder = Get-WellKnownFolder -MailboxName $MailboxName -FolderName Inbox -PropList $PropList -AccessToken $AccessToken
             foreach ($Prop in $RootFolder.singleValueExtendedProperties) {
                 if($Prop.Id -match $PropList[0].Id){
                     $RootFolder | Add-Member -NotePropertyName $PropList[0].Id -NotePropertyValue ([System.BitConverter]::ToString([Convert]::FromBase64String($Prop.Value)).Replace("-", ""))   

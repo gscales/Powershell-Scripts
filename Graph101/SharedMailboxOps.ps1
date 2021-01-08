@@ -757,11 +757,16 @@ function Send-SharedMessage
 	Begin
 	{
         if([String]::IsNullOrEmpty($From)){
-            $From = $TargetMailbox
+            if($SendOnBehalf){
+                $From = $LogonMailbox
+            }else{
+                $From = $TargetMailbox
+            }
+           
         }
         if([String]::IsNullOrEmpty($SenderEmailAddress)){
             if($SendOnBehalf){
-                $SenderEmailAddress = $LogonMailbox
+                $SenderEmailAddress = $TargetMailbox
             }
         }
         $prompt = $true
@@ -805,7 +810,10 @@ function Send-SharedMessage
 		}
         $EndPoint = "https://graph.microsoft.com/v1.0/users"
         $RequestURL = $EndPoint + "('$TargetMailbox')/sendMail"
-        if($SendOnBehalf -bor $SaveToLogonMailbox){
+        if($SendOnBehalf){
+            $RequestURL = "https://graph.microsoft.com/v1.0/me/sendMail"
+        }
+        if($SaveToLogonMailbox){
             $RequestURL = "https://graph.microsoft.com/v1.0/me/sendMail"
         }
         $headers = @{

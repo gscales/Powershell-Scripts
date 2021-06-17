@@ -213,6 +213,7 @@ function Import-ContactsFromCSV(){
             if($batchCount -gt 4){
                 $headers = @{
                     'Authorization' = "Bearer $AccessToken"
+                    'x-AnchorMailbox' = "$TargetUser"
                 }
                 $RequestURL = "https://graph.microsoft.com/v1.0/`$batch"
                 $BatchResponse = (Invoke-RestMethod -Method POST -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers -Body (ConvertTo-json  $BatchRequestContent -depth 10 -Compress) -ContentType "application/json" )   
@@ -248,6 +249,7 @@ function Import-ContactsFromCSV(){
         if($batchCount -gt 1){
             $headers = @{
                 'Authorization' = "Bearer $AccessToken"
+                'x-AnchorMailbox' = "$TargetUser"
             }
             $RequestURL = "https://graph.microsoft.com/v1.0/`$batch"
             $BatchResponse = (Invoke-RestMethod -Method POST -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers -Body (ConvertTo-json  $BatchRequestContent -depth 10 -Compress) -ContentType "application/json" )   

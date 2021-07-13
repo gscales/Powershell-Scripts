@@ -105,7 +105,10 @@ function Get-AzureUsersFromGraph{
         $filter,
         [Parameter(Position = 9, Mandatory = $false)]
         [String]
-        $SelectList
+        $SelectList,
+        [Parameter(Position = 10, Mandatory = $false)]
+        [switch]
+        $AdvancedQuery
 
     )
 
@@ -125,12 +128,20 @@ function Get-AzureUsersFromGraph{
         }  
         if(![String]::IsNullOrEmpty($filter)){
             $RequestURL += "&`$filter=" + $filter
-        }  
-       
-        $headers = @{
-            'Authorization' = "Bearer $AccessToken"
-            'AnchorMailbox' = "$MailboxName"
-        }
+        } 
+        if($AdvancedQuery.IsPresent){
+            $RequestURL += "&`$Count=true"
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+                'ConsistencyLevel' = "eventual"
+            }
+        }else{
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+            } 
+        } 
         do {
             $Results = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers)
             $RequestURL  = $null

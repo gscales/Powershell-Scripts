@@ -186,9 +186,8 @@ function Get-AzureUsersFromGraphUsingCertificateAuth{
             $RequestURL = $EndPoint + "&`$Select=" + $SelectList
         }  
         if(![String]::IsNullOrEmpty($filter)){
-            $RequestURL = $EndPoint + "&`$filter=" + $filter
-        }  
-       
+            $RequestURL += "&`$filter=" + $filter
+        }         
         $headers = @{
             'Authorization' = "Bearer $AccessToken"
             'AnchorMailbox' = "$MailboxName"

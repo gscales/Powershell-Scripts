@@ -124,7 +124,7 @@ function Get-AzureUsersFromGraph{
             $RequestURL = $EndPoint + "&`$Select=" + $SelectList
         }  
         if(![String]::IsNullOrEmpty($filter)){
-            $RequestURL = $EndPoint + "&`$filter=" + $filter
+            $RequestURL += "&`$filter=" + $filter
         }  
        
         $headers = @{

@@ -79,7 +79,7 @@ function Get-AccessTokenForGraph {
     
 }
 
-function Get-AzureUsesFromGraph{
+function Get-AzureUsersFromGraph{
     [CmdletBinding()]
     param (
         [Parameter(Position = 1, Mandatory = $true)]

@@ -172,7 +172,10 @@ function Get-AzureUsersFromGraphUsingCertificateAuth{
         $SelectList,
         [Parameter(Position = 6, Mandatory = $false)]
         [switch]
-        $AdvancedQuery
+        $AdvancedQuery,
+        [Parameter(Position = 7, Mandatory = $false)]
+        [Int32]
+        $Top=999
 
     )
 
@@ -182,11 +185,10 @@ function Get-AzureUsersFromGraphUsingCertificateAuth{
             $token = Get-AccessTokenForGraphFromCertificate -TenantDomain $TenantDomain -ClientId $ClientId -Certificate $Certificate
             $AccessToken = $token.access_token        
         }     
-        $top=999
-        $EndPoint = "https://graph.microsoft.com/v1.0/users?`$top=$top"
+        $EndPoint = "https://graph.microsoft.com/v1.0/users?`$top=$Top"
         $RequestURL = $EndPoint 
         if(![String]::IsNullOrEmpty($SelectList)){
-            $RequestURL = $EndPoint + "&`$Select=" + $SelectList
+            $RequestURL += "&`$Select=" + $SelectList
         }  
         if(![String]::IsNullOrEmpty($filter)){
             $RequestURL += "&`$filter=" + $filter

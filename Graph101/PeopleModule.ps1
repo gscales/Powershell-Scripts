@@ -108,10 +108,7 @@ function Get-AzureUsersFromGraph{
         $SelectList,
         [Parameter(Position = 10, Mandatory = $false)]
         [switch]
-        $AdvancedQuery,
-        [Parameter(Position = 11, Mandatory = $false)]
-        [Int32]
-        $Top=999
+        $AdvancedQuery
 
     )
 
@@ -123,10 +120,11 @@ function Get-AzureUsersFromGraph{
         if([String]::IsNullOrEmpty($AccessToken)){
             $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
         }     
+        $top=999
         $EndPoint = "https://graph.microsoft.com/v1.0/users?`$top=$top"
         $RequestURL = $EndPoint 
         if(![String]::IsNullOrEmpty($SelectList)){
-            $RequestURL += "&`$Select=" + $SelectList
+            $RequestURL = $EndPoint + "&`$Select=" + $SelectList
         }  
         if(![String]::IsNullOrEmpty($filter)){
             $RequestURL += "&`$filter=" + $filter
@@ -144,6 +142,99 @@ function Get-AzureUsersFromGraph{
                 'AnchorMailbox' = "$MailboxName"
             } 
         } 
+        do {
+            $Results = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers)
+            $RequestURL  = $null
+            if($Results){
+                if ($Results.value) {
+                    $QueryResults = $Results.value
+                } else {
+                    $QueryResults = $Results
+                }
+                foreach($Item in $QueryResults){        
+                    Write-Output $Item                          
+                }
+                $QueryResults = $null         
+                $RequestURL = $Results.'@odata.nextlink'      
+            }
+        } until (!($RequestURL))        
+        
+    }
+}
+
+function Invoke-SearchPeople{
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [String]
+        $scopes = "People.Read.All People.Read",
+        [Parameter(Position = 6, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,	
+        [Parameter(Position = 7, Mandatory = $false)]
+        [String]
+        $AccessToken,
+        [Parameter(Position = 8, Mandatory = $false)]
+        [String]
+        $filter,
+        [Parameter(Position = 9, Mandatory = $false)]
+        [String]
+        $SelectList,
+        [Parameter(Position = 10, Mandatory = $false)]
+        [String]
+        $SearchString,
+        [Parameter(Position = 11, Mandatory = $false)]
+        [Int32]
+        $Top=100,
+        [Parameter(Position = 12, Mandatory = $false)]
+        [switch]
+        $DirectoryOnly
+
+    )
+
+    process {
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
+        if([String]::IsNullOrEmpty($AccessToken)){
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        }     
+        $EndPoint = "https://graph.microsoft.com/v1.0/me/people/"
+        $RequestURL = $EndPoint 
+        if($SearchString){
+            $RequestURL +="?`$Top=$Top&`$Search=`"" + $SearchString + "`""
+        }else{
+            $RequestURL +="?`$Top=$Top"
+        } 
+        if(![String]::IsNullOrEmpty($SelectList)){
+            $RequestURL += "&`$Select=" + $SelectList
+        }  
+        if(![String]::IsNullOrEmpty($filter)){
+            $RequestURL += "&`$filter=" + $filter
+        } 
+        if($DirectoryOnly.IsPresent){
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+                'X-PeopleQuery-QuerySources' = "Directory"
+            }
+        }else{
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+                'X-PeopleQuery-QuerySources' = "Mailbox,Directory"
+            }
+        }
         do {
             $Results = (Invoke-RestMethod -Method Get -Uri $RequestURL -UserAgent "GraphBasicsPs101" -Headers $headers)
             $RequestURL  = $null

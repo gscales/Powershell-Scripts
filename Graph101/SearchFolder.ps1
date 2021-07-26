@@ -77,6 +77,79 @@ function Get-AccessTokenForGraph {
     
 }
 
+function Get-AccessTokenForGraphFromCertificate{
+    param(
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $TenantDomain,
+        [Parameter(Position = 2, Mandatory = $true)]
+        [String]
+        $ClientId,
+		[Parameter(Position = 3, Mandatory = $false)]
+		[System.Security.Cryptography.X509Certificates.X509Certificate2]
+        $Certificate,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $Scope = "https://graph.microsoft.com/.default"
+         
+    )
+    Process{       
+        
+        # Create base64 hash of certificate
+        $CertificateBase64Hash = [System.Convert]::ToBase64String($Certificate.GetCertHash()) -replace '\+','-' -replace '/','_' -replace '='
+        
+        # Create Token Timestamps
+        $StartDate = (Get-Date "1970-01-01T00:00:00Z" ).ToUniversalTime()
+        $TokenExpiration = [math]::Round(((New-TimeSpan -Start $StartDate -End (Get-Date).ToUniversalTime().AddMinutes(2)).TotalSeconds),0)
+        $NotBefore = [math]::Round(((New-TimeSpan -Start $StartDate -End ((Get-Date).ToUniversalTime())).TotalSeconds),0)
+        
+        $ClientAssertionheader = @{
+            alg = "RS256"
+            typ = "JWT"           
+            x5t = $CertificateBase64Hash 
+        }        
+        $ClientAssertionPayLoad = @{           
+            aud = "https://login.microsoftonline.com/$TenantDomain/oauth2/token"        
+            exp = $TokenExpiration
+            iss = $ClientId
+            jti = [guid]::NewGuid()
+            nbf = $NotBefore
+            sub = $ClientId
+        }
+        $CAEncodedHeader = [System.Convert]::ToBase64String(([System.Text.Encoding]::UTF8.GetBytes(($ClientAssertionheader | ConvertTo-Json)))) -replace '\+','-' -replace '/','_' -replace '='
+        $CAEncodedPayload = [System.Convert]::ToBase64String(([System.Text.Encoding]::UTF8.GetBytes(($ClientAssertionPayLoad | ConvertTo-Json)))) -replace '\+','-' -replace '/','_' -replace '=' 
+        
+        # Get the private key object of your certificate
+        $PrivateKey = ([System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Certificate))
+        $RSAPadding = [Security.Cryptography.RSASignaturePadding]::Pkcs1
+        $HashAlgorithm = [Security.Cryptography.HashAlgorithmName]::SHA256
+        
+        # Sign the Assertion
+        $Signature = [Convert]::ToBase64String(
+            $PrivateKey.SignData([System.Text.Encoding]::UTF8.GetBytes(($CAEncodedHeader + "." + $CAEncodedPayload)),$HashAlgorithm,$RSAPadding)
+        ) -replace '\+','-' -replace '/','_' -replace '='
+        
+        # Create the assertion token
+        $ClientAssertion = $CAEncodedHeader + "." + $CAEncodedPayload + "." + $Signature
+        
+        # Create a hash with body parameters
+        $Body = @{
+            client_id = $ClientId
+            client_assertion = $ClientAssertion
+            client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+            scope = $Scope
+            grant_type = "client_credentials"        
+        }
+        
+        $AuthUrl = "https://login.microsoftonline.com/$TenantDomain/oauth2/v2.0/token"
+        
+        return Invoke-RestMethod -Headers $Header -Method POST -Uri $AuthUrl -Body $Body -ContentType 'application/x-www-form-urlencoded'
+     
+    }
+}
+
+
+
 
 function Invoke-CreateCategorySearchFolder {
     [CmdletBinding()]
@@ -101,7 +174,16 @@ function Invoke-CreateCategorySearchFolder {
         $SearchFolderName,	
         [Parameter(Position = 7, Mandatory = $true)]
         [String]
-        $CategoryName		
+        $CategoryName,
+        [Parameter(Position = 8, Mandatory = $false)]
+        [switch]
+        $ServicePrincipalAuthentication,
+        [Parameter(Position = 9, Mandatory = $true)]
+        [String]
+        $CertificateThumbPrint,  
+        [Parameter(Position =10, Mandatory = $true)]
+        [string]
+        $TenantDomain  		
     )
 
     process {
@@ -112,7 +194,13 @@ function Invoke-CreateCategorySearchFolder {
         }
         $EndPoint = "https://graph.microsoft.com/v1.0/users"
         $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('SearchFolders')/childfolders"
-        $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        if($ServicePrincipalAuthentication.IsPresent){
+            $Certificate = Get-Item ("Cert:\CurrentUser\My\$CertificateThumbPrint")
+            $token = Get-AccessTokenForGraphFromCertificate -TenantDomain $TenantDomain -ClientId $ClientId -Certificate $Certificate
+            $AccessToken = $token.access_token      
+        }else{
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        }     
         $JsonBody = @"
 {
     "@odata.type": "microsoft.graph.mailSearchFolder",
@@ -154,7 +242,17 @@ function Invoke-CreateSearchFolder {
         $SearchFolderName,	
         [Parameter(Position = 7, Mandatory = $true)]
         [String]
-        $Filter		
+        $Filter,        
+        [Parameter(Position = 8, Mandatory = $false)]
+        [switch]
+        $ServicePrincipalAuthentication,
+        [Parameter(Position = 9, Mandatory = $true)]
+        [String]
+        $CertificateThumbPrint,  
+        [Parameter(Position =10, Mandatory = $true)]
+        [string]
+        $TenantDomain  
+
     )
 
     process {
@@ -165,7 +263,13 @@ function Invoke-CreateSearchFolder {
         }
         $EndPoint = "https://graph.microsoft.com/v1.0/users"
         $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('SearchFolders')/childfolders"
-        $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        if($ServicePrincipalAuthentication.IsPresent){
+            $Certificate = Get-Item ("Cert:\CurrentUser\My\$CertificateThumbPrint")
+            $token = Get-AccessTokenForGraphFromCertificate -TenantDomain $TenantDomain -ClientId $ClientId -Certificate $Certificate
+            $AccessToken = $token.access_token      
+        }else{
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        }        
         $JsonBody = @"
 {
     "@odata.type": "microsoft.graph.mailSearchFolder",
@@ -207,7 +311,16 @@ function Get-SearchFolders {
         $AutoPrompt,
         [Parameter(Position = 6, Mandatory = $false)]
         [String]
-        $Filter 
+        $Filter,
+        [Parameter(Position = 7, Mandatory = $false)]
+        [switch]
+        $ServicePrincipalAuthentication,
+        [Parameter(Position = 8, Mandatory = $true)]
+        [String]
+        $CertificateThumbPrint,  
+        [Parameter(Position = 9, Mandatory = $true)]
+        [string]
+        $TenantDomain  	 
 
     )
 
@@ -222,7 +335,13 @@ function Get-SearchFolders {
             $RequestURL += "&`$Filter=" + $Filter
         }
         if([String]::IsNullOrEmpty($AccessToken)){
-            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+            if($ServicePrincipalAuthentication.IsPresent){
+                $Certificate = Get-Item ("Cert:\CurrentUser\My\$CertificateThumbPrint")
+                $token = Get-AccessTokenForGraphFromCertificate -TenantDomain $TenantDomain -ClientId $ClientId -Certificate $Certificate
+                $AccessToken = $token.access_token      
+            }else{
+                $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+            }  
         }  
 		do
 		{

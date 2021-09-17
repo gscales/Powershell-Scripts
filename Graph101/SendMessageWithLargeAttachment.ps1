@@ -1,35 +1,3 @@
-function Invoke-UploadFile {
-    param( 
-        [Parameter(Position = 1, Mandatory = $true)] [string]$filePath,
-        [Parameter(Position = 2, Mandatory = $false)] [Int32]$uploadChunkSize=4000    
-              
-    )  
-    Process {      
-        $fileStream = New-Object System.IO.StreamReader($filePath)
-        Write-Verbose $fileStream.BaseStream.Length
-        if($uploadChunkSize -gt $fileStream.BaseStream.Length){
-            $uploadChunkSize = $fileStream.BaseStream.Length
-        }
-        $FileOffsetStart = 0
-        $FileSize = $fileStream.BaseStream.Length       
-        $FileBuffer = [byte[]]::new($uploadChunkSize)
-        do {            
-            $FileChunkByteCount = $fileStream.BaseStream.Read($FileBuffer,0,$FileBuffer.Length) 
-            Write-Verbose ($fileStream.BaseStream.Position)
-            $FileOffsetEnd = $fileStream.BaseStream.Position-1
-            if($FileChunkByteCount -gt 0){
-                $UploadRangeHeader = "bytes " + $FileOffsetStart + "-" + $FileOffsetEnd + "/" + $FileSize
-                Write-Verbose $UploadRangeHeader
-                $FileBuffer = [byte[]]::new($uploadChunkSize)
-                $FileOffsetStart = $fileStream.BaseStream.Position
-                $binaryContent = New-Object System.Net.Http.ByteArrayContent -ArgumentList @($FileBuffer,0,$FileChunkByteCount)
-            }          
-
-         }while($FileChunkByteCount -ne 0)         
-    }
-}
-
-
 function Show-OAuthWindow {
     [CmdletBinding()]
     param (

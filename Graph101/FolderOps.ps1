@@ -98,7 +98,10 @@ function Get-FolderFromPath {
         $scopes = "User.Read.All Mail.Read",
         [Parameter(Position = 5, Mandatory = $false)]
         [switch]
-        $AutoPrompt	
+        $AutoPrompt,
+        [Parameter(Position = 6, Mandatory = $false)]
+        [String]
+        $AccessToken	
     )
 
     process {
@@ -109,7 +112,10 @@ function Get-FolderFromPath {
         }
         $EndPoint = "https://graph.microsoft.com/v1.0/users"
         $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('MsgFolderRoot')/childfolders?"
-        $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        if(!$AccessToken){
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        }     
+
         $fldArray = $FolderPath.Split("\")
         $PropList = @()
         $FolderSizeProp = Get-TaggedProperty -DataType "Long" -Id "0x66b3"
@@ -227,6 +233,54 @@ function Get-WellKnownFolder {
             }
         }
         return $tfTargetFolder 
+    }
+}
+
+function Invoke-CreateMailboxFolder{
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]
+        $FolderPath,		
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $scopes = "User.Read.All Mail.ReadWrite",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,
+        [Parameter(Position = 6, Mandatory = $true)]
+        [string]
+        $NewFolderName	
+    )
+
+    process {
+        $EndPoint = "https://graph.microsoft.com/v1.0/users"
+        $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        $ParentFolder = Get-FolderFromPath -FolderPath $FolderPath -MailboxName $MailboxName -AccessToken $AccessToken
+        if($ParentFolder){
+            $folderId = $ParentFolder.id.ToString()
+            $RequestURL = $EndPoint + "('$MailboxName')/MailFolders('$folderId')/childfolders?"
+            $headers = @{
+                'Authorization' = "Bearer $AccessToken"
+                'AnchorMailbox' = "$MailboxName"
+            }
+$Body = @"
+        {
+         "displayName": "$NewFolderName"
+         }
+"@
+            $Newfolder = Invoke-RestMethod -Uri $RequestURL -Headers $headers -Method Post -Body $Body -ContentType "application/json"
+            return $Newfolder
+        } 
     }
 }
 

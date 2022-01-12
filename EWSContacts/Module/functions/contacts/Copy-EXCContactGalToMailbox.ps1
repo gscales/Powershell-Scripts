@@ -80,7 +80,7 @@
 		$folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Contacts, $MailboxName)
 		if ($Folder)
 		{
-			$Contacts = Get-EXCContactFolder -Service $service -FolderPath $Folder -SmptAddress $MailboxName
+			$Contacts = Get-EXCContactFolder -Service $service -FolderPath $Folder -SmtpAddress $MailboxName
 		}
 		else
 		{

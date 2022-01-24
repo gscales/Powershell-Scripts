@@ -395,7 +395,7 @@ function Invoke-CreateAppointment {
         [Parameter(Position = 10, Mandatory = $true)]
         [String]
         $Location,
-        [Parameter(Position = 10, Mandatory = $false)]
+        [Parameter(Position = 11, Mandatory = $false)]
         [String]
         $AccessToken		
     )
@@ -438,6 +438,108 @@ $Body = @"
     "location":{
         "displayName": "$Location"
     }    
+}
+"@
+        return Invoke-RestMethod -Uri $RequestURL -Headers $Header -Method Post -Body $Body -ContentType "application/json"
+   
+    }
+}
+
+function Invoke-CreateMeeting {
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $false)]
+        [string]
+        $FolderName,		
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ClientId,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $RedirectURI = "urn:ietf:wg:oauth:2.0:oob",
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $scopes = "Calendars.ReadWrite",
+        [Parameter(Position = 5, Mandatory = $false)]
+        [switch]
+        $AutoPrompt,
+        [Parameter(Position = 6, Mandatory = $true)]
+        [DateTime]
+        $StartTime,
+        [Parameter(Position = 7, Mandatory = $true)]
+        [DateTime]
+        $EndTime,
+        [Parameter(Position = 8, Mandatory = $true)]
+        [String]
+        $Subject,
+        [Parameter(Position = 9, Mandatory = $true)]
+        [String]
+        $Body,
+        [Parameter(Position = 10, Mandatory = $true)]
+        [String]
+        $Location,
+        [Parameter(Position = 11, Mandatory = $true)]
+        [PSObject]
+        $Attendees,
+        [Parameter(Position = 12, Mandatory = $false)]
+        [String]
+        $AccessToken		
+    )
+
+    process {
+        
+        $prompt = $true
+        if($AutoPrompt.IsPresent){
+            $prompt = $false
+        }
+        $EndPoint = "https://graph.microsoft.com/v1.0/users"
+        $RequestURL = $EndPoint + "('$MailboxName')/calendar/events"
+        if(!$AccessToken){
+            $AccessToken = Get-AccessTokenForGraph -MailboxName $Mailboxname -ClientId $ClientId -RedirectURI $RedirectURI -scopes $scopes -Prompt:$prompt
+        }       
+        $Header = @{
+            'Authorization' = "Bearer $AccessToken"
+            'AnchorMailbox' = "$MailboxName"
+        }
+        $StartTimeString = $StartTime.ToString('o')
+        $EndTimeString = $StartTime.ToString('o')
+        $TimeZoneString = (Get-TimeZone).id
+        $AttendeesJSON = @()
+        foreach($attendee in $Attendees){
+            $attendeeJson = "" | Select emailAddress,type
+            $attendeeJson.emailAddress = "" | Select address,name
+            $attendeeJson.emailAddress.address = $attendee
+            $attendeeJson.emailAddress.name = $attendee
+            $attendeeJson.type = "required"
+            Write-Output  $attendeeJson
+            $AttendeesJSON +=  $attendeeJson
+        }
+        $attendeesJSONString = ConvertTo-Json $AttendeesJSON -Depth 5
+        
+
+
+$Body = @"
+{
+    "subject": "$Subject",
+    "body": {
+      "contentType": "HTML",
+      "content": "$Body"
+    },
+    "start": {
+        "dateTime":  "$StartTimeString",
+        "timeZone": "$TimeZoneString"
+    },
+    "end": {
+        "dateTime": "$EndTimeString",
+        "timeZone": "$TimeZoneString"
+    },
+    "location":{
+        "displayName": "$Location"
+    },
+    "attendees":  $attendeesJSONString   
 }
 "@
         return Invoke-RestMethod -Uri $RequestURL -Headers $Header -Method Post -Body $Body -ContentType "application/json"

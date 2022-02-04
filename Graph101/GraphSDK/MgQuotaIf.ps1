@@ -3,10 +3,7 @@ function Get-MailboxQuotaIf {
     param (   
         [Parameter(Position = 1, Mandatory = $true)]
         [Int32]
-        $QuotaIfVal,
-        [Parameter(Position = 2, Mandatory = $false)]
-        [String]
-        $OutputFile
+        $QuotaIfVal
     )
     Process {
         Connect-MgGraph -Scopes "Reports.Read.All" | Out-Null

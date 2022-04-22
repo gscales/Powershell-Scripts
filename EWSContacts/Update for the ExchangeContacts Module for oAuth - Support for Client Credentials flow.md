@@ -51,3 +51,5 @@ For this you can use something like
     Get-EXCContacts -MailboxName gscales@datarumble.com -ModernAuth -CertificateFilePath C:\temp\mp.pfx -CertificatePassword $certPassword -ClientId 2fe2dc9c-b746-4112-8a11-5054dce06af4
 
 When using the client credentials flow it will use EWS Impersonation so the TargetMailbox passed in as the -MailboxName will be impersonated.
+
+I haven't gone into documented the setup of the client credentials flow as there are many examples of this elsewhere. If you have any question send me an email or create an issue on gitHub.

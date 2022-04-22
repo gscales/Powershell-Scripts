@@ -75,7 +75,19 @@
 		
 		[Parameter(Position = 8, Mandatory = $False)]
 		[String]
-		$ClientId
+		$ClientId,
+
+		[Parameter(Position = 9, Mandatory = $False)]
+		[String]
+		$RedirectUri= "urn:ietf:wg:oauth:2.0:oob",
+
+		[Parameter(Position = 10, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 11, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword  
 		
 	)
 	Begin
@@ -84,22 +96,22 @@
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -Partial -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -Partial -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 			}
 			else
 			{
-				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Folder $Folder -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 			}
 		}
 		else
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Partial -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+				$Contacts = Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -Partial -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 			}
 			else
 			{ 
-				$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+				$Contacts =  Get-EXCContacts -MailboxName $MailboxName -Credentials $Credentials -ForExportToVcf -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 			}
 		}
 		$ExportCollection = @()

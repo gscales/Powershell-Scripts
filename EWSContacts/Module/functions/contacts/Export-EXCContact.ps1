@@ -69,7 +69,19 @@
 		
 		[Parameter(Position = 7, Mandatory = $False)]
 		[String]
-		$ClientId
+		$ClientId,
+
+		[Parameter(Position = 8, Mandatory = $False)]
+		[String]
+		$RedirectUri= "urn:ietf:wg:oauth:2.0:oob",
+
+		[Parameter(Position = 9, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 10, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword  
 		
 	)
 	Begin
@@ -78,22 +90,22 @@
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Folder $Folder -Partial -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Folder $Folder -Partial -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 			}
 			else
 			{
-				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Folder $Folder -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Folder $Folder -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 			}
 		}
 		else
 		{
 			if ($Partial.IsPresent)
 			{
-				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Partial -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+				$Contacts = Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -Partial -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 			}
 			else
 			{
-				$Contacts =  Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+				$Contacts =  Get-EXCContact -MailboxName $MailboxName -EmailAddress $EmailAddress -Credentials $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 			}
 		}
 		

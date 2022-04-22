@@ -50,15 +50,26 @@
 		
 		[Parameter(Position = 6, Mandatory = $False)]
 		[String]
-		$ClientId
+		$ClientId,
+		
+		[Parameter(Position = 7, Mandatory = $False)]
+		[String]
+		$RedirectUri= "urn:ietf:wg:oauth:2.0:oob",
 
+		[Parameter(Position = 8, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 9, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword  
 	)
 	Begin
 	{
 		$Script:rptCollection = @()
 		import-module path $CrediCardValdatorDLLPath
 		#Connect
-		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId  -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 		if ($useImpersonation.IsPresent)
 		{
 			$service.ImpersonatedUserId = New-Object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)

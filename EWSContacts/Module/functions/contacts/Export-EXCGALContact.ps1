@@ -67,12 +67,24 @@
 		
 		[Parameter(Position = 7, Mandatory = $False)]
 		[String]
-		$ClientId
+		$ClientId,
+
+		[Parameter(Position = 8, Mandatory = $False)]
+		[String]
+		$RedirectUri= "urn:ietf:wg:oauth:2.0:oob",
+
+		[Parameter(Position = 9, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 10, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword  
 		
 	)
 	process
 	{
-		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+		$service = Connect-EXCExchange -MailboxName $MailboxName -Credential $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 		$Error.Clear()
 		$cnpsPropset = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)
 		$ncCol = $service.ResolveName($EmailAddress, $ParentFolderIds, [Microsoft.Exchange.WebServices.Data.ResolveNameSearchLocation]::DirectoryOnly, $true, $cnpsPropset)

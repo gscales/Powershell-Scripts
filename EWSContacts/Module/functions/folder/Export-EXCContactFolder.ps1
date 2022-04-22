@@ -79,6 +79,18 @@
         [Parameter(Position = 8, Mandatory = $false)]
         [switch]
         $SkypeForBusinessContacts,
+
+        [Parameter(Position = 9, Mandatory = $False)]
+		[String]
+		$RedirectUri= "urn:ietf:wg:oauth:2.0:oob",
+
+		[Parameter(Position = 10, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 11, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword,  
      
        
         [ValidateSet('CSV')]

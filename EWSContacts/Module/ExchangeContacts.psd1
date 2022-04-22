@@ -4,7 +4,7 @@
 	ModuleToProcess = 'ExchangeContacts.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.6.0.0'
+	ModuleVersion = '1.7.0.0'
 	
 	# ID used to uniquely identify this module
 	GUID = '6901af86-a39e-4a4c-afa6-b8ead127c674'
@@ -78,6 +78,7 @@
 		'Get-EXCContactGroups',
 		'Get-EXCDumpsterContacts',
 		'New-EXCContact',
+		'New-EXCBatchContact',
 		'New-EXCContactGroup',
 		'Get-EXCPrivacyReport',
 		'Remove-EXCContact',

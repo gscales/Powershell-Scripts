@@ -31,7 +31,19 @@
 		
 		[Parameter(Position = 3, Mandatory = $False)]
 		[String]
-		$ClientId
+		$ClientId = "d3590ed6-52b3-4102-aeff-aad2292ab01c",
+
+		[Parameter(Position = 4, Mandatory = $False)]
+		[String]
+		$redirectUri= "urn:ietf:wg:oauth:2.0:oob",
+
+		[Parameter(Position = 5, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 6, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword  
 	)
 	Begin {
 		## Load Managed API dll  
@@ -79,17 +91,36 @@
 			if ([String]::IsNullOrEmpty($ClientId)) {
 				$ClientId = "d3590ed6-52b3-4102-aeff-aad2292ab01c"
 			}		
-			Import-Module ($script:ModuleRoot + "/bin/Microsoft.IdentityModel.Clients.ActiveDirectory.dll") -Force
-			$Context = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext("https://login.microsoftonline.com/common")
-			if ($Credentials -eq $null) {
-				$PromptBehavior = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters -ArgumentList Auto  
-				
-				$token = ($Context.AcquireTokenAsync("https://outlook.office365.com", $ClientId , "urn:ietf:wg:oauth:2.0:oob", $PromptBehavior)).Result
+			Import-Module ($script:ModuleRoot + "/bin/Microsoft.Identity.Client.dll") -Force	
+			if([string]::IsNullOrEmpty($CertificateFilePath)){
+				if ($Credentials -eq $null) {				
+					$scope = "https://outlook.office.com/EWS.AccessAsUser.All";
+					$Scopes = New-Object System.Collections.Generic.List[string]
+					$Scopes.Add($Scope)				
+					$pcaConfig = [Microsoft.Identity.Client.PublicClientApplicationBuilder]::Create($ClientId).WithRedirectUri($redirectUri)
+					$token = $pcaConfig.Build().AcquireTokenInteractive($Scopes).WithPrompt([Microsoft.Identity.Client.Prompt]::SelectAccount).WithLoginHint($MailboxName).ExecuteAsync().Result
+					$service.Credentials = New-Object Microsoft.Exchange.WebServices.Data.OAuthCredentials($token.AccessToken)
+				}else{
+					$scope = "https://outlook.office.com/EWS.AccessAsUser.All";
+					$Scopes = New-Object System.Collections.Generic.List[string]
+					$Scopes.Add($Scope)				
+					$pcaConfig = [Microsoft.Identity.Client.PublicClientApplicationBuilder]::Create($ClientId).WithAuthority([Microsoft.Identity.Client.AadAuthorityAudience]::AzureAdMultipleOrgs)				
+					$token = $pcaConfig.Build().AcquireTokenByUsernamePassword($Scopes,$Credentials.UserName,$Credentials.Password).ExecuteAsync().Result;
+					$service.Credentials = New-Object Microsoft.Exchange.WebServices.Data.OAuthCredentials($token.AccessToken)
+				}
+			}
+			else{
+				$exVal = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+				$certificateObject = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $CertificateFilePath, $CertificatePassword , $exVal
+				$domain = $MailboxName.Split("@")[1]
+				$Scope = "https://outlook.office365.com/.default"
+				$TenantId = (Invoke-WebRequest https://login.windows.net/$domain/v2.0/.well-known/openid-configuration | ConvertFrom-Json).token_endpoint.Split('/')[3]
+				$app =  [Microsoft.Identity.Client.ConfidentialClientApplicationBuilder]::Create($ClientId).WithCertificate($certificateObject).WithTenantId($TenantId).Build()
+				$Scopes = New-Object System.Collections.Generic.List[string]
+				$Scopes.Add($Scope)
+				$token = $app.AcquireTokenForClient($Scopes).ExecuteAsync().Result
 				$service.Credentials = New-Object Microsoft.Exchange.WebServices.Data.OAuthCredentials($token.AccessToken)
-			}else{
-				$AADcredential = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.UserPasswordCredential" -ArgumentList  $Credentials.UserName.ToString(), $Credentials.GetNetworkCredential().password.ToString()
-				$token = [Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContextIntegratedAuthExtensions]::AcquireTokenAsync($Context,"https://outlook.office365.com",$ClientId,$AADcredential).result
-				$service.Credentials = New-Object Microsoft.Exchange.WebServices.Data.OAuthCredentials($token.AccessToken)
+				$service.ImpersonatedUserId = New-Object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName)			
 			}
 		}
 		else {
@@ -139,7 +170,12 @@
 		## Set the URL of the CAS (Client Access Server) to use two options are availbe to use Autodiscover to find the CAS URL or Hardcode the CAS to use  
 		
 		#CAS URL Option 1 Autodiscover  
-		$service.AutodiscoverUrl($MailboxName, { $true })
+		if([string]::IsNullOrEmpty($CertificateFilePath)){
+			$service.AutodiscoverUrl($MailboxName, { $true })
+		}else{
+			$uri=[system.URI] "https://outlook.office365.com/ews/exchange.asmx" 
+			$service.Url = $uri 
+		}
 		#Write-host ("Using CAS Server : " + $Service.url)
 		
 		#CAS URL Option 2 Hardcoded  

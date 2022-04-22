@@ -46,12 +46,24 @@
 		
 		[Parameter(Position = 5, Mandatory = $False)]
 		[String]
-		$ClientId
+		$ClientId,
+
+		[Parameter(Position = 6, Mandatory = $False)]
+		[String]
+		$RedirectUri= "urn:ietf:wg:oauth:2.0:oob",
+
+		[Parameter(Position = 7, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 8, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword  
 	)
 	process
 	{
 		if(![String]::IsNullOrEmpty($MailboxName)){
-			$service = Connect-EXCExchange -MailboxName $MailboxName -Credentials $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId
+			$service = Connect-EXCExchange -MailboxName $MailboxName -Credentials $Credentials -ModernAuth:$ModernAuth.IsPresent -ClientId $ClientId  -RedirectUri $RedirectUri -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
 		}
 		## Find and Bind to Folder based on Path  
 		#Define the path to search should be seperated with \  

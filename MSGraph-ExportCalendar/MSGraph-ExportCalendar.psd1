@@ -4,7 +4,7 @@
 	ModuleToProcess = 'MSGraph-ExportCalendar.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.4.1.0'
+	ModuleVersion = '1.4.2.0'
 	
 	# ID used to uniquely identify this module
 	GUID = '57480126-da64-40ae-ae7b-c30d65e77bee'

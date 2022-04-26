@@ -26,10 +26,22 @@ function Export-GCECalendarToCSV {
 	
 	.PARAMETER FileName
 		File to Export the Calendar Appointments to
+
+    .PARAMETER CertificateFilePath
+		File path for the certificate used for Authentication 
+    
+    .PARAMETER CertificatePassword 
+
+        Password for Certificate File    
 	
 	.EXAMPLE
         Export the last years Calendar appointments to a CSV
         Export-GCECalendarToCSV -MailboxName gscales@datarumble.com -StartTime (Get-Date).AddYears(-1) -EndTime (Get-Date) -FileName c:\export\lastyear.csv
+
+        Export the last years Calendar appointments to a CSV using certificate Authenticaiton
+
+        $certPassword = ConvertTo-SecureString -String "1234xxxx" -Force -AsPlainText
+         Export-GCECalendarToCSV -MailboxName gscales@datarumble.com -StartTime (Get-Date).AddYears(-1) -EndTime (Get-Date) -FileName c:\export\lastyear.csv -CertificateFilePath c:\temp\cert.pfx -CertificatePassword $certPassword -ClientId 6bedba33-c26f-4e7b-a262-35ef4592fa7b
 	
 	
 #>
@@ -54,10 +66,18 @@ function Export-GCECalendarToCSV {
         $FileName,
         [Parameter(Position = 7, Mandatory = $false)]
         [String]
-        $redirectURL
+        $redirectURL,
+
+        [Parameter(Position = 8, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 9, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword 
     )
     Begin {  
-        $Events = Export-GCECalendar -MailboxName $MailboxName -ClientId $ClientId -StartTime $StartTime -EndTime $EndTime -TimeZone $TimeZone
+        $Events = Export-GCECalendar -MailboxName $MailboxName -ClientId $ClientId -StartTime $StartTime -EndTime $EndTime -TimeZone $TimeZone -redirectURL $redirectURL -CertificateFilePath $CertificateFilePath -CertificatePassword $CertificatePassword
         $Events | Export-Csv -NoTypeInformation -Path $FileName
         Write-Verbose("Exported to " + $FileName)
     }
@@ -82,7 +102,15 @@ function Export-GCECalendar {
         $TimeZone,
         [Parameter(Position = 6, Mandatory = $false)]
         [String]
-        $redirectURL
+        $redirectURL,
+        
+        [Parameter(Position = 7, Mandatory = $False)]
+		[String]
+		$CertificateFilePath,
+		
+		[Parameter(Position = 8, Mandatory = $False)]
+		[Security.SecureString]
+		$CertificatePassword  
 
         
 
@@ -95,17 +123,24 @@ function Export-GCECalendar {
         if ([String]::IsNullOrEmpty($redirectURL)) {
             $redirectURL = "https://login.microsoftonline.com/common/oauth2/nativeclient"
         }		
-        $adal = Join-Path $script:ModuleRoot "Microsoft.IdentityModel.Clients.ActiveDirectory.dll"
-        $adalforms = Join-Path $script:ModuleRoot "Microsoft.IdentityModel.Clients.ActiveDirectory.Platform.dll"
-        if ([System.IO.File]::Exists($adal)) { 
-            Import-Module $adal -Force
-        }
-        if ([System.IO.File]::Exists($adalforms)) { 
-            Import-Module $adalforms -Force
-        }  
-        $PromptBehavior = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters -ArgumentList Auto       
-        $Context = New-Object Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext("https://login.microsoftonline.com/common")
-        $token = ($Context.AcquireTokenAsync("https://graph.microsoft.com", $ClientId , $redirectURL, $PromptBehavior)).Result
+        Import-Module ($script:ModuleRoot + "/bin/Microsoft.Identity.Client.dll") -Force
+        if([string]::IsNullOrEmpty($CertificateFilePath)){	
+            $Scopes = New-Object System.Collections.Generic.List[string]
+            $Scopes.Add("https://graph.microsoft.com/Calendars.Read")	
+            $Scopes.Add("https://graph.microsoft.com/Calendars.Read.Shared")			
+            $pcaConfig = [Microsoft.Identity.Client.PublicClientApplicationBuilder]::Create($ClientId).WithRedirectUri($redirectURL)
+            $token = $pcaConfig.Build().AcquireTokenInteractive($Scopes).WithPrompt([Microsoft.Identity.Client.Prompt]::SelectAccount).WithLoginHint($MailboxName).ExecuteAsync().Result 
+        }else{
+            $exVal = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+            $certificateObject = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $CertificateFilePath, $CertificatePassword , $exVal
+            $domain = $MailboxName.Split("@")[1]
+            $Scope = "https://graph.microsoft.com/.default"
+            $TenantId = (Invoke-WebRequest https://login.windows.net/$domain/v2.0/.well-known/openid-configuration | ConvertFrom-Json).token_endpoint.Split('/')[3]
+            $app =  [Microsoft.Identity.Client.ConfidentialClientApplicationBuilder]::Create($ClientId).WithCertificate($certificateObject).WithTenantId($TenantId).Build()
+            $Scopes = New-Object System.Collections.Generic.List[string]
+            $Scopes.Add($Scope)
+            $token = $app.AcquireTokenForClient($Scopes).ExecuteAsync().Result
+        }       
         $HttpClient = Get-HTTPClient -MailboxName $MailboxName -Token $token.AccessToken
         if ([String]::IsNullOrEmpty($TimeZone)) {
             $TimeZone = [TimeZoneInfo]::Local.Id;

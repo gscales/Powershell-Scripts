@@ -6,7 +6,7 @@
     )  
  	Begin
 		 {
-		Load-EWSManagedAPI
+			Invoke-LoadEWSManagedAPI
 		
 		## Set Exchange Version  
 		$ExchangeVersion = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2010_SP2
@@ -57,29 +57,38 @@
 	}
 }
 
-function Load-EWSManagedAPI{
-    param( 
-    )  
- 	Begin
-	{
-		## Load Managed API dll  
-		###CHECK FOR EWS MANAGED API, IF PRESENT IMPORT THE HIGHEST VERSION EWS DLL, ELSE EXIT
-		$EWSDLL = (($(Get-ItemProperty -ErrorAction SilentlyContinue -Path Registry::$(Get-ChildItem -ErrorAction SilentlyContinue -Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Exchange\Web Services'|Sort-Object Name -Descending| Select-Object -First 1 -ExpandProperty Name)).'Install Directory') + "Microsoft.Exchange.WebServices.dll")
-		if (Test-Path $EWSDLL)
-		    {
-		    Import-Module $EWSDLL
-		    }
-		else
-		    {
-		    "$(get-date -format yyyyMMddHHmmss):"
-		    "This script requires the EWS Managed API 1.2 or later."
-		    "Please download and install the current version of the EWS Managed API from"
-		    "http://go.microsoft.com/fwlink/?LinkId=255472"
-		    ""
-		    "Exiting Script."
-		    exit
-		    } 
-  	}
+function Invoke-LoadEWSManagedAPI {
+	param( 
+	)  
+	Begin {
+		if (Test-Path ($script:ModuleRoot + "/Microsoft.Exchange.WebServices.dll")) {
+			Import-Module ($script:ModuleRoot + "/Microsoft.Exchange.WebServices.dll")
+			$Script:EWSDLL = $script:ModuleRoot + "/Microsoft.Exchange.WebServices.dll"
+			write-verbose ("Using EWS dll from Local Directory")
+		}
+		else {
+
+			
+			## Load Managed API dll  
+			###CHECK FOR EWS MANAGED API, IF PRESENT IMPORT THE HIGHEST VERSION EWS DLL, ELSE EXIT
+			$EWSDLL = (($(Get-ItemProperty -ErrorAction SilentlyContinue -Path Registry::$(Get-ChildItem -ErrorAction SilentlyContinue -Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Exchange\Web Services'|Sort-Object Name -Descending| Select-Object -First 1 -ExpandProperty Name)).'Install Directory') + "Microsoft.Exchange.WebServices.dll")
+			if (Test-Path $EWSDLL) {
+				Import-Module $EWSDLL
+				$Script:EWSDLL = $EWSDLL 
+			}
+			else {
+				"$(get-date -format yyyyMMddHHmmss):"
+				"This script requires the EWS Managed API 1.2 or later."
+				"Please download and install the current version of the EWS Managed API from"
+				"http://go.microsoft.com/fwlink/?LinkId=255472"
+				""
+				"Exiting Script."
+				exit
+
+
+			} 
+		}
+	}
 }
 
 function Handle-SSL{
@@ -238,3 +247,4 @@ function Get-SearchFolders{
 	}
 
 }
+$script:ModuleRoot = $PSScriptRoot

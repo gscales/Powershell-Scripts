@@ -185,7 +185,9 @@ function Get-UnReadMessageCount {
 		[Parameter(Position = 4, Mandatory = $false)] [switch]$basicAuth,
 		[Parameter(Position = 5, Mandatory = $false)] [System.Management.Automation.PSCredential]$Credentials,
 		[Parameter(Position = 6, Mandatory = $false)] [switch]$useImpersonation,
-		[Parameter(Position = 7, Mandatory = $true)] [Int32]$Months
+		[Parameter(Position = 7, Mandatory = $false)] [switch]$AllItems,
+		[Parameter(Position = 8, Mandatory = $false)] [switch]$Archive,
+		[Parameter(Position = 9, Mandatory = $true)] [Int32]$Months
 	)  
 	Begin {
 		$eval1 = "Last" + $Months + "MonthsTotal"
@@ -213,8 +215,12 @@ function Get-UnReadMessageCount {
 			$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $MailboxName) 
 		}
 		$AQSString1 = "System.Message.DateReceived:>" + [system.DateTime]::Now.AddMonths(-$Months).ToString("yyyy-MM-dd")   
-		$folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $MailboxName)     
-		$Inbox = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $folderid)  
+		$folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $MailboxName)
+		if($AllItems.IsPresent){
+			$Inbox =  Get-AllItemsSearchFolder -MailboxName $MailboxName -service $service -Archive:$Archive.IsPresent
+		}else{
+			$Inbox = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $folderid)  
+		}	
 		$folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::SentItems, $MailboxName)     
 		$SentItems = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $folderid)    
 		$ivItemView = New-Object Microsoft.Exchange.WebServices.Data.ItemView(1000)  
@@ -284,6 +290,30 @@ function Get-UnReadMessageCount {
 	}
 }
 
+function Get-AllItemsSearchFolder{
+    param(
+        [Parameter(Position = 1, Mandatory = $true)] [string]$MailboxName,
+        [Parameter(Position = 2, Mandatory = $true)] [Microsoft.Exchange.WebServices.Data.ExchangeService]$service,
+		[Parameter(Position = 3, Mandatory = $false)] [switch]$Archive
+    )
+    Process{
+        $folderidcnt = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Root,$MailboxName)
+		if($Archive.IsPresent){
+			$folderidcnt = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::ArchiveRoot,$MailboxName)
+		}
+        $fvFolderView = New-Object Microsoft.Exchange.WebServices.Data.FolderView(1)
+        $fvFolderView.Traversal = [Microsoft.Exchange.WebServices.Data.FolderTraversal]::Shallow;
+        $SfSearchFilter = new-object Microsoft.Exchange.WebServices.Data.SearchFilter+IsEqualTo([Microsoft.Exchange.WebServices.Data.FolderSchema]::DisplayName, "allitems") 
+        $findFolderResults = $service.FindFolders($folderidcnt, $SfSearchFilter, $fvFolderView) 
+        if($findFolderResults.Folders.Count -eq 1){
+            return $findFolderResults.Folders[0]
+        }
+        else{
+            throw "Error getting All Item SearchFolders"
+        }
+    }
+
+}
 
 function Invoke-ValidateToken {
 	param (

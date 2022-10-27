@@ -21,7 +21,7 @@ function Get-MailBoxFolderFromPath {
             #Perform search based on the displayname of each folder level
             $FolderName = $fldArray[$lint];
             $tfTargetFolder = Get-MgUserMailFolderChildFolder -UserId $MailboxName -Filter "DisplayName eq '$FolderName'" -MailFolderId $folderId -All 
-            if ($tfTargetFolder.displayname -match $FolderName) {
+            if ($tfTargetFolder.displayname -eq $FolderName) {
                 $folderId = $tfTargetFolder.Id.ToString()
             }
             else {
@@ -46,7 +46,11 @@ function Invoke-EnumerateMailBoxFolders {
 		
         [Parameter(Position = 2, Mandatory = $true)]
         [String]
-        $MailboxName
+        $MailboxName,
+
+        [Parameter(Position = 3, Mandatory = $false)]
+        [switch]
+        $returnSearchRoot
     )
 
     process {
@@ -57,8 +61,11 @@ function Invoke-EnumerateMailBoxFolders {
         }
         if($WellKnownFolder){
             $searchRootFolder = Get-MgUserMailFolder -UserId $MailboxName -MailFolderId $WellKnownFolder             
-        }         
-        $Script:Mailboxfolders += $searchRootFolder
+        }
+        if($returnSearchRoot){               
+            $Script:Mailboxfolders += $searchRootFolder
+
+        }      
         if($searchRootFolder){
             Invoke-EnumerateChildMailFolders -MailboxName $MailboxName -folderId $searchRootFolder.id
         }      

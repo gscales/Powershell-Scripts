@@ -2,27 +2,24 @@
 [VOID][System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms")
 $Script:form = new-object System.Windows.Forms.form
 $Script:Treeinfo = @{ }
-function Invoke-SMCOpenMailbox
-{
+function Invoke-SMCOpenMailbox {
 	[CmdletBinding()]
 	param (
-        [Parameter(Position = 0, Mandatory = $true)] [String]$MailboxName,
-        [Parameter(Position = 1, Mandatory = $false)] [String]$FolderName = "MsgFolderRoot"
+		[Parameter(Position = 0, Mandatory = $true)] [String]$MailboxName,
+		[Parameter(Position = 1, Mandatory = $false)] [String]$FolderName = "MsgFolderRoot"
 	)
 	
-	Process
-	{        
+	Process {        
 		$tvTreView.Nodes.Clear()
 		$Script:Treeinfo.Clear()
-        $rootFolder = Get-MgUserMailFolder -UserId $MailboxName -MailFolderId $FolderName 
+		$rootFolder = Get-MgUserMailFolder -UserId $MailboxName -MailFolderId $FolderName 
 		$Folders = Invoke-EnumerateMailBoxFolders -MailboxName $MailboxName -WellKnownFolder $FolderName   
 		$Script:Treeinfo = @{ }       
-        $TNRoot = new-object System.Windows.Forms.TreeNode("Root")
+		$TNRoot = new-object System.Windows.Forms.TreeNode("Root")
 		$TNRoot.Name = "Mailbox"
 		$TNRoot.Text = "Mailbox - " + $emEmailAddressTextBox.Text
 		$exProgress = 0
-		foreach ($ffFolder in $Folders)
-		{
+		foreach ($ffFolder in $Folders) {
 			#Process folder here
 			$ParentFolderId = $ffFolder.parentFolderId
 			$folderName = $ffFolder.displayName
@@ -30,17 +27,14 @@ function Invoke-SMCOpenMailbox
 			$TNChild.Name = $folderName
 			$TNChild.Text = $folderName
 			$TNChild.tag = $ffFolder			
-			if ($ParentFolderId -eq $rootFolder.Id)
-			{
+			if ($ParentFolderId -eq $rootFolder.Id) {
 				[void]$TNRoot.Nodes.Add($TNChild)
 				$Script:Treeinfo.Add($ffFolder.Id.ToString(), $TNChild)
 			}
-			else
-			{
+			else {
 				$pfFolder = $Script:Treeinfo[$ParentFolderId]
 				[void]$pfFolder.Nodes.Add($TNChild)
-				if ($Script:Treeinfo.ContainsKey($ffFolder.Id) -eq $false)
-				{
+				if ($Script:Treeinfo.ContainsKey($ffFolder.Id) -eq $false) {
 					$Script:Treeinfo.Add($ffFolder.Id, $TNChild)
 				}
 			}
@@ -52,151 +46,149 @@ function Invoke-SMCOpenMailbox
 }
 
 function Get-TaggedProperty {
-    [CmdletBinding()]
-    param (
-        [Parameter(Position = 0, Mandatory = $true)]
-        [String]
-        $DataType,
+	[CmdletBinding()]
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[String]
+		$DataType,
 		
-        [Parameter(Position = 1, Mandatory = $true)]
-        [String]
-        $Id,
+		[Parameter(Position = 1, Mandatory = $true)]
+		[String]
+		$Id,
 		
-        [Parameter(Position = 2, Mandatory = $false)]
-        [String]
-        $Value
-    )
-    Begin {
-        $Property = "" | Select-Object Id, DataType, PropertyType, Value
-        $Property.Id = $Id
-        $Property.DataType = $DataType
-        $Property.PropertyType = "Tagged"
-        if (![String]::IsNullOrEmpty($Value)) {
-            $Property.Value = $Value
-        }
-        return, $Property
-    }
+		[Parameter(Position = 2, Mandatory = $false)]
+		[String]
+		$Value
+	)
+	Begin {
+		$Property = "" | Select-Object Id, DataType, PropertyType, Value
+		$Property.Id = $Id
+		$Property.DataType = $DataType
+		$Property.PropertyType = "Tagged"
+		if (![String]::IsNullOrEmpty($Value)) {
+			$Property.Value = $Value
+		}
+		return, $Property
+	}
 }
 
 function Get-ExtendedPropList {
-    [CmdletBinding()]
-    param (
-        [Parameter(Position = 1, Mandatory = $false)]
-        [PSCustomObject]
-        $PropertyList
-    )
-    Begin {
-        $rtString = "";
-        $PropName = "Id"
-        foreach ($Prop in $PropertyList) {
-            if ($Prop.PropertyType -eq "Tagged") {
-                if ($rtString -eq "") {
-                    $rtString = "($PropName eq '" + $Prop.DataType + " " + $Prop.Id + "')"
-                }
-                else {
-                    $rtString += " or ($PropName eq '" + $Prop.DataType + " " + $Prop.Id + "')"
-                }
-            }
-            else {
-                if ($Prop.Type -eq "String") {
-                    if ($rtString -eq "") {
-                        $rtString = "($PropName eq '" + $Prop.DataType + " {" + $Prop.Guid + "} Name " + $Prop.Id + "')"
-                    }
-                    else {
-                        $rtString += " or ($PropName eq '" + $Prop.DataType + " {" + $Prop.Guid + "} Name " + $Prop.Id + "')"
-                    }
-                }
-                else {
-                    if ($rtString -eq "") {
-                        $rtString = "($PropName eq '" + $Prop.DataType + " {" + $Prop.Guid + "} Id " + $Prop.Id + "')"
-                    }
-                    else {
-                        $rtString += " or ($PropName eq '" + $Prop.DataType + " {" + $Prop.Guid + "} Id " + $Prop.Id + "')"
-                    }
-                }
-            }
+	[CmdletBinding()]
+	param (
+		[Parameter(Position = 1, Mandatory = $false)]
+		[PSCustomObject]
+		$PropertyList
+	)
+	Begin {
+		$rtString = "";
+		$PropName = "Id"
+		foreach ($Prop in $PropertyList) {
+			if ($Prop.PropertyType -eq "Tagged") {
+				if ($rtString -eq "") {
+					$rtString = "($PropName eq '" + $Prop.DataType + " " + $Prop.Id + "')"
+				}
+				else {
+					$rtString += " or ($PropName eq '" + $Prop.DataType + " " + $Prop.Id + "')"
+				}
+			}
+			else {
+				if ($Prop.Type -eq "String") {
+					if ($rtString -eq "") {
+						$rtString = "($PropName eq '" + $Prop.DataType + " {" + $Prop.Guid + "} Name " + $Prop.Id + "')"
+					}
+					else {
+						$rtString += " or ($PropName eq '" + $Prop.DataType + " {" + $Prop.Guid + "} Name " + $Prop.Id + "')"
+					}
+				}
+				else {
+					if ($rtString -eq "") {
+						$rtString = "($PropName eq '" + $Prop.DataType + " {" + $Prop.Guid + "} Id " + $Prop.Id + "')"
+					}
+					else {
+						$rtString += " or ($PropName eq '" + $Prop.DataType + " {" + $Prop.Guid + "} Id " + $Prop.Id + "')"
+					}
+				}
+			}
 			
-        }
-        return "SingleValueExtendedProperties(`$filter=" + $rtString + ")" 	
-    }
+		}
+		return "SingleValueExtendedProperties(`$filter=" + $rtString + ")" 	
+	}
 }
 
 function Invoke-EnumerateMailBoxFolders {
-    [CmdletBinding()]
-    param (
-        [Parameter(Position = 0, Mandatory = $false)]
-        [string]
-        $FolderPath,
+	[CmdletBinding()]
+	param (
+		[Parameter(Position = 0, Mandatory = $false)]
+		[string]
+		$FolderPath,
 
-        [Parameter(Position = 1, Mandatory = $false)]
-        [string]
-        $WellKnownFolder,
+		[Parameter(Position = 1, Mandatory = $false)]
+		[string]
+		$WellKnownFolder,
 		
-        [Parameter(Position = 2, Mandatory = $true)]
-        [String]
-        $MailboxName,
+		[Parameter(Position = 2, Mandatory = $true)]
+		[String]
+		$MailboxName,
 
-        [Parameter(Position = 3, Mandatory = $false)]
-        [switch]
-        $returnSearchRoot
-    )
+		[Parameter(Position = 3, Mandatory = $false)]
+		[switch]
+		$returnSearchRoot
+	)
 
-    process {
-        $Script:Mailboxfolders = @()
-        if($FolderPath){
-            $searchRootFolder = Get-MailBoxFolderFromPath -MailboxName $MailboxName -FolderPath $FolderPath
-            Add-Member -InputObject $searchRootFolder -NotePropertyName "FolderPath" -NotePropertyValue $FolderPath
-        }
-        if($WellKnownFolder){
-            $searchRootFolder = Get-MgUserMailFolder -UserId $MailboxName -MailFolderId $WellKnownFolder             
-        }
-        if($returnSearchRoot){               
-            $Script:Mailboxfolders += $searchRootFolder
+	process {
+		$Script:Mailboxfolders = @()
+		if ($FolderPath) {
+			$searchRootFolder = Get-MailBoxFolderFromPath -MailboxName $MailboxName -FolderPath $FolderPath
+			Add-Member -InputObject $searchRootFolder -NotePropertyName "FolderPath" -NotePropertyValue $FolderPath
+		}
+		if ($WellKnownFolder) {
+			$searchRootFolder = Get-MgUserMailFolder -UserId $MailboxName -MailFolderId $WellKnownFolder             
+		}
+		if ($returnSearchRoot) {               
+			$Script:Mailboxfolders += $searchRootFolder
 
-        }      
-        if($searchRootFolder){
-            Invoke-EnumerateChildMailFolders -MailboxName $MailboxName -folderId $searchRootFolder.id
-        }      
-        return $Script:Mailboxfolders 
-    }
+		}      
+		if ($searchRootFolder) {
+			Invoke-EnumerateChildMailFolders -MailboxName $MailboxName -folderId $searchRootFolder.id
+		}      
+		return $Script:Mailboxfolders 
+	}
 }
 
-function Invoke-EnumerateChildMailFolders{
-    [CmdletBinding()]
-    param (
-        [Parameter(Position = 0, Mandatory = $true)]
-        [string]
-        $folderId,
+function Invoke-EnumerateChildMailFolders {
+	[CmdletBinding()]
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[string]
+		$folderId,
 		
-        [Parameter(Position = 1, Mandatory = $true)]
-        [String]
-        $MailboxName
-    )
+		[Parameter(Position = 1, Mandatory = $true)]
+		[String]
+		$MailboxName
+	)
 
-    process {
-        $childFolders = Get-MgUserMailFolderChildFolder -UserId $MailboxName -MailFolderId $folderId -All -ExpandProperty "singleValueExtendedProperties(`$filter=id eq 'String 0x66b5')"
-        Write-Verbose ("Returned " + $childFolders.Count)
-        foreach($childfolder in $childFolders){
-            #Expand-ExtendedProperties -Item $childfolder
-            $Script:Mailboxfolders += $childfolder
-            if($childfolder.ChildFolderCount -gt 0){
-                Invoke-EnumerateChildMailFolders -MailboxName $MailboxName -folderId $childfolder.id
-            }
-        }
-    }
+	process {
+		$childFolders = Get-MgUserMailFolderChildFolder -UserId $MailboxName -MailFolderId $folderId -All -ExpandProperty "singleValueExtendedProperties(`$filter=id eq 'String 0x66b5')"
+		Write-Verbose ("Returned " + $childFolders.Count)
+		foreach ($childfolder in $childFolders) {
+			#Expand-ExtendedProperties -Item $childfolder
+			$Script:Mailboxfolders += $childfolder
+			if ($childfolder.ChildFolderCount -gt 0) {
+				Invoke-EnumerateChildMailFolders -MailboxName $MailboxName -folderId $childfolder.id
+			}
+		}
+	}
 }
 
-function Start-SMCMailClient
-{
+function Start-SMCMailClient {
 	[CmdletBinding()]
 	param (
 		[Parameter(Position = 0, Mandatory = $true)]
 		[String]
 		$MailboxName,
-        [Parameter(Position = 1, Mandatory = $false)] [String]$FolderName = "MsgFolderRoot"
+		[Parameter(Position = 1, Mandatory = $false)] [String]$FolderName = "MsgFolderRoot"
 	)
-	Process
-	{
+	Process {
 		$Script:form = new-object System.Windows.Forms.form
 		$Script:Treeinfo = @{ }
 		$mbtable = New-Object System.Data.DataTable
@@ -292,13 +284,11 @@ function Start-SMCMailClient
 		$seSearchCheck.Location = new-object System.Drawing.Size(585, 50)
 		$seSearchCheck.Size = new-object System.Drawing.Size(30, 25)
 		[Void]$seSearchCheck.Add_Click({
-				if ($seSearchCheck.Checked -eq $false)
-				{
+				if ($seSearchCheck.Checked -eq $false) {
 					$sbSearchTextBox.Enabled = $false
 					$snSearchPropDrop.Enabled = $false
 				}
-				else
-				{
+				else {
 					$sbSearchTextBox.Enabled = $true
 					$snSearchPropDrop.Enabled = $true
 				}
@@ -346,14 +336,13 @@ function Start-SMCMailClient
 		$Script:form.size = new-object System.Drawing.Size(1200, 800)
 		$Script:form.autoscroll = $true
 		[Void]$Script:form.Add_Shown({ $Script:form.Activate() })
-        $emEmailAddressTextBox.Text = $MailboxName
-        Invoke-SMCOpenMailbox -MailboxName $MailboxName -FolderName $FolderName 
+		$emEmailAddressTextBox.Text = $MailboxName
+		Invoke-SMCOpenMailbox -MailboxName $MailboxName -FolderName $FolderName 
 		[Void]$Script:form.ShowDialog()
 	}
 }
 
-function Get-SMCClientFolderItems
-{
+function Get-SMCClientFolderItems {
 	[CmdletBinding()]
 	Param (
 		
@@ -362,11 +351,9 @@ function Get-SMCClientFolderItems
 	$props += (Get-TaggedProperty -id 0x0E08 -DataType Long)
 	$mbtable.Clear()
 	$folder = $Script:lfFolderID
-	if ($seSearchCheck.Checked)
-	{
+	if ($seSearchCheck.Checked) {
 		$sfilter = ""
-		switch ($snSearchPropDrop.SelectedItem.ToString())
-		{
+		switch ($snSearchPropDrop.SelectedItem.ToString()) {
 			"Subject" {
 				$sfilter = "Subject:'" + $sbSearchTextBox.Text.ToString() + "'"				
 			}
@@ -377,49 +364,45 @@ function Get-SMCClientFolderItems
 				$sfilter = "`"From:'" + $sbSearchTextBox.Text.ToString() + "'`""				
 			}
 		}
-		if(!$sfilter -eq ""){
+		if (!$sfilter -eq "") {
 			$Items = Get-MgUserMailFolderMessage -UserId $emEmailAddressTextBox.Text -MailFolderId $folder.id -Top $neResultCheckNum.Value -Search $sfilter -ExpandProperty (Get-ExtendedPropList -PropertyList $props)
 		}
 	}
-	else
-	{
+	else {
 		$Items = Get-MgUserMailFolderMessage -UserId $emEmailAddressTextBox.Text -MailFolderId $folder.id -Top $neResultCheckNum.Value -ExpandProperty (Get-ExtendedPropList -PropertyList $props)
 	}
-	foreach ($mail in $Items)
-	{
+	foreach ($mail in $Items) {
 		if ($mail.sender.emailAddress.name -ne $null) { $fnFromName = $mail.sender.emailAddress.name }
 		else { $fnFromName = "N/A" }
 		if ($mail.Subject -ne $null) { $sbSubject = $mail.Subject.ToString() }
 		else { $sbSubject = "N/A" }
-		$messageSize = [math]::round($mail.SingleValueExtendedProperties[0].value /1Kb, 0)
+		$messageSize = [math]::round($mail.SingleValueExtendedProperties[0].value / 1Kb, 0)
 		$mbtable.rows.add($fnFromName, $sbSubject, $mail.receivedDateTime, $messageSize, $mail.id, $mail.hasAttachments)
 	}
 	$dgDataGrid.DataSource = $mbtable
 }
 
-function Invoke-SMCExportMessage
-{
+function Invoke-SMCExportMessage {
 	[CmdletBinding()]
 	Param (
 		$MessageID
 	)	
 	$MessageID = $mbtable.DefaultView[$dgDataGrid.CurrentCell.RowIndex][4]
-    $saveFileDialog = [System.Windows.Forms.SaveFileDialog]@{
-        CheckPathExists  = $true
-        CreatePrompt     = $true
-        OverwritePrompt  = $true
-        InitialDirectory = [Environment]::GetFolderPath('MyDocuments')
-        FileName         = $mbtable.DefaultView[$dgDataGrid.CurrentCell.RowIndex][1]
-        Title            = 'Choose directory to save the exported message'
-        Filter           = "Email Message documents (.eml)|*.eml"
-    }
-    if($saveFileDialog.ShowDialog() -eq 'Ok') {
+	$saveFileDialog = [System.Windows.Forms.SaveFileDialog]@{
+		CheckPathExists  = $true
+		CreatePrompt     = $true
+		OverwritePrompt  = $true
+		InitialDirectory = [Environment]::GetFolderPath('MyDocuments')
+		FileName         = $mbtable.DefaultView[$dgDataGrid.CurrentCell.RowIndex][1]
+		Title            = 'Choose directory to save the exported message'
+		Filter           = "Email Message documents (.eml)|*.eml"
+	}
+	if ($saveFileDialog.ShowDialog() -eq 'Ok') {
 		Get-MgUserMessageContent -UserId  $emEmailAddressTextBox.Text -MessageId $MessageID -OutFile $saveFileDialog.FileName 
-    }
+	}
 	
 }
-function Invoke-SMCShowClientMessage
-{
+function Invoke-SMCShowClientMessage {
 	[CmdletBinding()]
 	Param (
 		$MessageID
@@ -459,8 +442,7 @@ function Invoke-SMCShowClientMessage
 	$miMessageTotextlabelBox.size = new-object System.Drawing.Size(400, 20)
 	$msgform.controls.Add($miMessageTotextlabelBox)
 	$ToRecips = "";
-	foreach ($torcp in $msMessage.toRecipients)
-	{
+	foreach ($torcp in $msMessage.toRecipients) {
 		$ToRecips += $torcp.emailAddress.address.ToString() + ";"
 	}
 	$miMessageTotextlabelBox.Text = $ToRecips
@@ -510,12 +492,10 @@ function Invoke-SMCShowClientMessage
 	$msgform.Controls.Add($exButton4)
 	
 	$attname = ""
-	if ($script:msMessage.hasattachments)
-	{
+	if ($script:msMessage.hasattachments) {
 		write-host "Attachment"
 		$exButton4.Enabled = $true		
-		foreach ($attach in $script:msMessage.Attachments)
-		{
+		foreach ($attach in $script:msMessage.Attachments) {
 			$attname = $attname + $attach.Name.ToString() + "; "
 		}
 	}
@@ -527,8 +507,7 @@ function Invoke-SMCShowClientMessage
 	$msgform.ShowDialog()	
 }
 
-function Invoke-SMCSaveAttachment
-{
+function Invoke-SMCSaveAttachment {
 	[CmdletBinding()]
 	Param (
 		
@@ -536,7 +515,7 @@ function Invoke-SMCSaveAttachment
 	
 	$dlfolder = new-object -ComObject shell.application
 	$dlfolderpath = $dlfolder.BrowseForFolder(0, "Download attachments to", 0)
-	foreach($attachment in $script:msMessage.Attachments){
+	foreach ($attachment in $script:msMessage.Attachments) {
 		$fiFile = new-object System.IO.FileStream(($dlfolderpath.Self.Path + "\" + $attachment.Name.ToString()), [System.IO.FileMode]::Create)
 		$attachBytes = [System.Convert]::FromBase64String($attachment.AdditionalProperties.contentBytes)
 		$fiFile.Write($attachBytes, 0, $attachBytes.Length)
@@ -545,8 +524,7 @@ function Invoke-SMCSaveAttachment
 	}
 }
 
-function Invoke-SMCShowClientHeader
-{
+function Invoke-SMCShowClientHeader {
 	[CmdletBinding()]
 	Param (
 		
@@ -571,8 +549,7 @@ function Invoke-SMCShowClientHeader
 	$hdrform.ShowDialog()
 }
 
-function Invoke-SMCNewClientMessage
-{
+function Invoke-SMCNewClientMessage {
 	[CmdletBinding()]
 	Param (
 		$Reply
@@ -650,8 +627,7 @@ function Invoke-SMCNewClientMessage
 	$script:newmsgform.ShowDialog()	
 }
 
-function Invoke-SMCSendClientMessage
-{
+function Invoke-SMCSendClientMessage {
 	[CmdletBinding()]
 	Param (
 		
@@ -661,8 +637,7 @@ function Invoke-SMCSendClientMessage
 	
 }
 
-function New-SMCEmailAddress
-{
+function New-SMCEmailAddress {
 	[CmdletBinding()]
 	param (
 		[Parameter(Position = 0, Mandatory = $false)]
@@ -673,15 +648,12 @@ function New-SMCEmailAddress
 		[string]
 		$Address
 	)
-	Begin
-	{
+	Begin {
 		$EmailAddress = "" | Select-Object Name, Address
-		if ([String]::IsNullOrEmpty($Name))
-		{
+		if ([String]::IsNullOrEmpty($Name)) {
 			$EmailAddress.Name = $Address
 		}
-		else
-		{
+		else {
 			$EmailAddress.Name = $Name
 		}
 		$EmailAddress.Address = $Address
@@ -690,8 +662,7 @@ function New-SMCEmailAddress
 }
 
 
-function Send-SMCMessageREST
-{
+function Send-SMCMessageREST {
 	[CmdletBinding()]
 	param (
 		[Parameter(Position = 0, Mandatory = $false)]
@@ -770,26 +741,21 @@ function Send-SMCMessageREST
 		[psobject]
 		$ReplyTo
 	)
-	Begin
-	{
+	Begin {
 		
-		if (![String]::IsNullOrEmpty($ItemClass))
-		{
+		if (![String]::IsNullOrEmpty($ItemClass)) {
 			$ItemClassProp = Get-EXRTaggedProperty -DataType "String" -Id "0x001A" -Value $ItemClass
-			if ($ExPropList -eq $null)
-			{
+			if ($ExPropList -eq $null) {
 				$ExPropList = @()
 			}
 			$ExPropList += $ItemClassProp
 		}
 		$SaveToSentFolder = "false"
-		if ($SaveToSentItems.IsPresent)
-		{
+		if ($SaveToSentItems.IsPresent) {
 			$SaveToSentFolder = "true"
 		}
 		$NewMessage = Get-MessageJSONFormat -Subject $Subject -Body $Body -SenderEmailAddress $SenderEmailAddress -Attachments $Attachments -ReferanceAttachments $ReferanceAttachments -ToRecipients $ToRecipients -SentDate $SentDate -ExPropList $ExPropList -CcRecipients $CCRecipients -bccRecipients $BCCRecipients -StandardPropList $StandardPropList -SaveToSentItems $SaveToSentFolder -SendMail -ReplyTo $ReplyTo -RequestReadRecipient $RequestReadRecipient.IsPresent -RequestDeliveryRecipient $RequestDeliveryRecipient.IsPresent
-		if ($ShowRequest.IsPresent)
-		{
+		if ($ShowRequest.IsPresent) {
 			write-host $NewMessage
 		}
 		Send-MgUserMail -UserId $MailboxName -BodyParameter $NewMessage 
@@ -798,357 +764,355 @@ function Send-SMCMessageREST
 }
 
 function Get-MessageJSONFormat {
-    [CmdletBinding()]
-    param (
-        [Parameter(Position = 1, Mandatory = $false)]
-        [String]
-        $Subject,
+	[CmdletBinding()]
+	param (
+		[Parameter(Position = 1, Mandatory = $false)]
+		[String]
+		$Subject,
 		
-        [Parameter(Position = 2, Mandatory = $false)]
-        [String]
-        $Body,
+		[Parameter(Position = 2, Mandatory = $false)]
+		[String]
+		$Body,
 		
-        [Parameter(Position = 3, Mandatory = $false)]
-        [psobject]
-        $SenderEmailAddress,
+		[Parameter(Position = 3, Mandatory = $false)]
+		[psobject]
+		$SenderEmailAddress,
 		
-        [Parameter(Position = 5, Mandatory = $false)]
-        [psobject]
-        $Attachments,
+		[Parameter(Position = 5, Mandatory = $false)]
+		[psobject]
+		$Attachments,
 		
-        [Parameter(Position = 5, Mandatory = $false)]
-        [psobject]
-        $ReferanceAttachments,
+		[Parameter(Position = 5, Mandatory = $false)]
+		[psobject]
+		$ReferanceAttachments,
 		
-        [Parameter(Position = 6, Mandatory = $false)]
-        [psobject]
-        $ToRecipients,
+		[Parameter(Position = 6, Mandatory = $false)]
+		[psobject]
+		$ToRecipients,
 		
-        [Parameter(Position = 7, Mandatory = $false)]
-        [psobject]
-        $CcRecipients,
+		[Parameter(Position = 7, Mandatory = $false)]
+		[psobject]
+		$CcRecipients,
 		
-        [Parameter(Position = 7, Mandatory = $false)]
-        [psobject]
-        $bccRecipients,
+		[Parameter(Position = 7, Mandatory = $false)]
+		[psobject]
+		$bccRecipients,
 		
-        [Parameter(Position = 8, Mandatory = $false)]
-        [psobject]
-        $SentDate,
+		[Parameter(Position = 8, Mandatory = $false)]
+		[psobject]
+		$SentDate,
 		
-        [Parameter(Position = 9, Mandatory = $false)]
-        [psobject]
-        $StandardPropList,
+		[Parameter(Position = 9, Mandatory = $false)]
+		[psobject]
+		$StandardPropList,
 		
-        [Parameter(Position = 10, Mandatory = $false)]
-        [psobject]
-        $ExPropList,
+		[Parameter(Position = 10, Mandatory = $false)]
+		[psobject]
+		$ExPropList,
 		
-        [Parameter(Position = 11, Mandatory = $false)]
-        [switch]
-        $ShowRequest,
+		[Parameter(Position = 11, Mandatory = $false)]
+		[switch]
+		$ShowRequest,
 		
-        [Parameter(Position = 12, Mandatory = $false)]
-        [String]
-        $SaveToSentItems,
+		[Parameter(Position = 12, Mandatory = $false)]
+		[String]
+		$SaveToSentItems,
 		
-        [Parameter(Position = 13, Mandatory = $false)]
-        [switch]
-        $SendMail,
+		[Parameter(Position = 13, Mandatory = $false)]
+		[switch]
+		$SendMail,
 		
-        [Parameter(Position = 14, Mandatory = $false)]
-        [psobject]
-        $ReplyTo,
+		[Parameter(Position = 14, Mandatory = $false)]
+		[psobject]
+		$ReplyTo,
 		
-        [Parameter(Position = 17, Mandatory = $false)]
-        [bool]
-        $RequestReadRecipient,
+		[Parameter(Position = 17, Mandatory = $false)]
+		[bool]
+		$RequestReadRecipient,
 		
-        [Parameter(Position = 18, Mandatory = $false)]
-        [bool]
-        $RequestDeliveryRecipient
-    )
-    Begin {
-        $NewMessage = "{" + "`r`n"
-        if ($SendMail.IsPresent) {
-            $NewMessage += "  `"Message`" : {" + "`r`n"
-        }
-        if (![String]::IsNullOrEmpty($Subject)) {
-            $NewMessage += "`"Subject`": `"" + $Subject + "`"" + "`r`n"
-        }
-        if ($SenderEmailAddress -ne $null) {
-            if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-            $NewMessage += "`"Sender`":{" + "`r`n"
-            $NewMessage += " `"EmailAddress`":{" + "`r`n"
-            $NewMessage += "  `"Name`":`"" + $SenderEmailAddress.Name + "`"," + "`r`n"
-            $NewMessage += "  `"Address`":`"" + $SenderEmailAddress.Address + "`"" + "`r`n"
-            $NewMessage += "}}" + "`r`n"
-        }
-        if (![String]::IsNullOrEmpty($Body)) {
-            if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-            $NewMessage += "`"Body`": {" + "`r`n"
-            $NewMessage += "`"ContentType`": `"HTML`"," + "`r`n"
-            $NewMessage += "`"Content`": `"" + $Body + "`"" + "`r`n"
-            $NewMessage += "}" + "`r`n"
-        }
+		[Parameter(Position = 18, Mandatory = $false)]
+		[bool]
+		$RequestDeliveryRecipient
+	)
+	Begin {
+		$NewMessage = "{" + "`r`n"
+		if ($SendMail.IsPresent) {
+			$NewMessage += "  `"Message`" : {" + "`r`n"
+		}
+		if (![String]::IsNullOrEmpty($Subject)) {
+			$NewMessage += "`"Subject`": `"" + $Subject + "`"" + "`r`n"
+		}
+		if ($SenderEmailAddress -ne $null) {
+			if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+			$NewMessage += "`"Sender`":{" + "`r`n"
+			$NewMessage += " `"EmailAddress`":{" + "`r`n"
+			$NewMessage += "  `"Name`":`"" + $SenderEmailAddress.Name + "`"," + "`r`n"
+			$NewMessage += "  `"Address`":`"" + $SenderEmailAddress.Address + "`"" + "`r`n"
+			$NewMessage += "}}" + "`r`n"
+		}
+		if (![String]::IsNullOrEmpty($Body)) {
+			if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+			$NewMessage += "`"Body`": {" + "`r`n"
+			$NewMessage += "`"ContentType`": `"HTML`"," + "`r`n"
+			$NewMessage += "`"Content`": `"" + $Body + "`"" + "`r`n"
+			$NewMessage += "}" + "`r`n"
+		}
 		
-        $toRcpcnt = 0;
-        if ($ToRecipients -ne $null) {
-            if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-            $NewMessage += "`"ToRecipients`": [ " + "`r`n"
-            foreach ($EmailAddress in $ToRecipients) {
-                if ($toRcpcnt -gt 0) {
-                    $NewMessage += "      ,{ " + "`r`n"
-                }
-                else {
-                    $NewMessage += "      { " + "`r`n"
-                }
-                $NewMessage += " `"EmailAddress`":{" + "`r`n"
-                $NewMessage += "  `"Name`":`"" + $EmailAddress.Name + "`"," + "`r`n"
-                $NewMessage += "  `"Address`":`"" + $EmailAddress.Address + "`"" + "`r`n"
-                $NewMessage += "}}" + "`r`n"
-                $toRcpcnt++
-            }
-            $NewMessage += "  ]" + "`r`n"
-        }
-        $ccRcpcnt = 0
-        if ($CcRecipients -ne $null) {
-            if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-            $NewMessage += "`"CcRecipients`": [ " + "`r`n"
-            foreach ($EmailAddress in $CcRecipients) {
-                if ($ccRcpcnt -gt 0) {
-                    $NewMessage += "      ,{ " + "`r`n"
-                }
-                else {
-                    $NewMessage += "      { " + "`r`n"
-                }
-                $NewMessage += " `"EmailAddress`":{" + "`r`n"
-                $NewMessage += "  `"Name`":`"" + $EmailAddress.Name + "`"," + "`r`n"
-                $NewMessage += "  `"Address`":`"" + $EmailAddress.Address + "`"" + "`r`n"
-                $NewMessage += "}}" + "`r`n"
-                $ccRcpcnt++
-            }
-            $NewMessage += "  ]" + "`r`n"
-        }
-        $bccRcpcnt = 0
-        if ($bccRecipients -ne $null) {
-            if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-            $NewMessage += "`"BccRecipients`": [ " + "`r`n"
-            foreach ($EmailAddress in $bccRecipients) {
-                if ($bccRcpcnt -gt 0) {
-                    $NewMessage += "      ,{ " + "`r`n"
-                }
-                else {
-                    $NewMessage += "      { " + "`r`n"
-                }
-                $NewMessage += " `"EmailAddress`":{" + "`r`n"
-                $NewMessage += "  `"Name`":`"" + $EmailAddress.Name + "`"," + "`r`n"
-                $NewMessage += "  `"Address`":`"" + $EmailAddress.Address + "`"" + "`r`n"
-                $NewMessage += "}}" + "`r`n"
-                $bccRcpcnt++
-            }
-            $NewMessage += "  ]" + "`r`n"
-        }
-        $ReplyTocnt = 0
-        if ($ReplyTo -ne $null) {
-            if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-            $NewMessage += "`"ReplyTo`": [ " + "`r`n"
-            foreach ($EmailAddress in $ReplyTo) {
-                if ($ReplyTocnt -gt 0) {
-                    $NewMessage += "      ,{ " + "`r`n"
-                }
-                else {
-                    $NewMessage += "      { " + "`r`n"
-                }
-                $NewMessage += " `"EmailAddress`":{" + "`r`n"
-                $NewMessage += "  `"Name`":`"" + $EmailAddress.Name + "`"," + "`r`n"
-                $NewMessage += "  `"Address`":`"" + $EmailAddress.Address + "`"" + "`r`n"
-                $NewMessage += "}}" + "`r`n"
-                $ReplyTocnt++
-            }
-            $NewMessage += "  ]" + "`r`n"
-        }
-        if ($RequestDeliveryRecipient) {
-            $NewMessage += ",`"IsDeliveryReceiptRequested`": true`r`n"
-        }
-        if ($RequestReadRecipient) {
-            $NewMessage += ",`"IsReadReceiptRequested`": true `r`n"
-        }
-        if ($StandardPropList -ne $null) {
-            foreach ($StandardProp in $StandardPropList) {
-                if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-                switch ($StandardProp.PropertyType) {
-                    "Single" {
-                        if ($StandardProp.QuoteValue) {
-                            $NewMessage += "`"" + $StandardProp.Name + "`": `"" + $StandardProp.Value + "`"" + "`r`n"
-                        }
-                        else {
-                            $NewMessage += "`"" + $StandardProp.Name + "`": " + $StandardProp.Value + "`r`n"
-                        }
+		$toRcpcnt = 0;
+		if ($ToRecipients -ne $null) {
+			if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+			$NewMessage += "`"ToRecipients`": [ " + "`r`n"
+			foreach ($EmailAddress in $ToRecipients) {
+				if ($toRcpcnt -gt 0) {
+					$NewMessage += "      ,{ " + "`r`n"
+				}
+				else {
+					$NewMessage += "      { " + "`r`n"
+				}
+				$NewMessage += " `"EmailAddress`":{" + "`r`n"
+				$NewMessage += "  `"Name`":`"" + $EmailAddress.Name + "`"," + "`r`n"
+				$NewMessage += "  `"Address`":`"" + $EmailAddress.Address + "`"" + "`r`n"
+				$NewMessage += "}}" + "`r`n"
+				$toRcpcnt++
+			}
+			$NewMessage += "  ]" + "`r`n"
+		}
+		$ccRcpcnt = 0
+		if ($CcRecipients -ne $null) {
+			if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+			$NewMessage += "`"CcRecipients`": [ " + "`r`n"
+			foreach ($EmailAddress in $CcRecipients) {
+				if ($ccRcpcnt -gt 0) {
+					$NewMessage += "      ,{ " + "`r`n"
+				}
+				else {
+					$NewMessage += "      { " + "`r`n"
+				}
+				$NewMessage += " `"EmailAddress`":{" + "`r`n"
+				$NewMessage += "  `"Name`":`"" + $EmailAddress.Name + "`"," + "`r`n"
+				$NewMessage += "  `"Address`":`"" + $EmailAddress.Address + "`"" + "`r`n"
+				$NewMessage += "}}" + "`r`n"
+				$ccRcpcnt++
+			}
+			$NewMessage += "  ]" + "`r`n"
+		}
+		$bccRcpcnt = 0
+		if ($bccRecipients -ne $null) {
+			if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+			$NewMessage += "`"BccRecipients`": [ " + "`r`n"
+			foreach ($EmailAddress in $bccRecipients) {
+				if ($bccRcpcnt -gt 0) {
+					$NewMessage += "      ,{ " + "`r`n"
+				}
+				else {
+					$NewMessage += "      { " + "`r`n"
+				}
+				$NewMessage += " `"EmailAddress`":{" + "`r`n"
+				$NewMessage += "  `"Name`":`"" + $EmailAddress.Name + "`"," + "`r`n"
+				$NewMessage += "  `"Address`":`"" + $EmailAddress.Address + "`"" + "`r`n"
+				$NewMessage += "}}" + "`r`n"
+				$bccRcpcnt++
+			}
+			$NewMessage += "  ]" + "`r`n"
+		}
+		$ReplyTocnt = 0
+		if ($ReplyTo -ne $null) {
+			if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+			$NewMessage += "`"ReplyTo`": [ " + "`r`n"
+			foreach ($EmailAddress in $ReplyTo) {
+				if ($ReplyTocnt -gt 0) {
+					$NewMessage += "      ,{ " + "`r`n"
+				}
+				else {
+					$NewMessage += "      { " + "`r`n"
+				}
+				$NewMessage += " `"EmailAddress`":{" + "`r`n"
+				$NewMessage += "  `"Name`":`"" + $EmailAddress.Name + "`"," + "`r`n"
+				$NewMessage += "  `"Address`":`"" + $EmailAddress.Address + "`"" + "`r`n"
+				$NewMessage += "}}" + "`r`n"
+				$ReplyTocnt++
+			}
+			$NewMessage += "  ]" + "`r`n"
+		}
+		if ($RequestDeliveryRecipient) {
+			$NewMessage += ",`"IsDeliveryReceiptRequested`": true`r`n"
+		}
+		if ($RequestReadRecipient) {
+			$NewMessage += ",`"IsReadReceiptRequested`": true `r`n"
+		}
+		if ($StandardPropList -ne $null) {
+			foreach ($StandardProp in $StandardPropList) {
+				if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+				switch ($StandardProp.PropertyType) {
+					"Single" {
+						if ($StandardProp.QuoteValue) {
+							$NewMessage += "`"" + $StandardProp.Name + "`": `"" + $StandardProp.Value + "`"" + "`r`n"
+						}
+						else {
+							$NewMessage += "`"" + $StandardProp.Name + "`": " + $StandardProp.Value + "`r`n"
+						}
 						
 						
-                    }
-                    "Object" {
-                        if ($StandardProp.isArray) {
-                            $NewMessage += "`"" + $StandardProp.PropertyName + "`": [ {" + "`r`n"
-                        }
-                        else {
-                            $NewMessage += "`"" + $StandardProp.PropertyName + "`": {" + "`r`n"
-                        }
-                        $acCount = 0
-                        foreach ($PropKeyValue in $StandardProp.PropertyList) {
-                            if ($acCount -gt 0) {
-                                $NewMessage += ","
-                            }
-                            $NewMessage += "`"" + $PropKeyValue.Name + "`": `"" + $PropKeyValue.Value + "`"" + "`r`n"
-                            $acCount++
-                        }
-                        if ($StandardProp.isArray) {
-                            $NewMessage += "}]" + "`r`n"
-                        }
-                        else {
-                            $NewMessage += "}" + "`r`n"
-                        }
+					}
+					"Object" {
+						if ($StandardProp.isArray) {
+							$NewMessage += "`"" + $StandardProp.PropertyName + "`": [ {" + "`r`n"
+						}
+						else {
+							$NewMessage += "`"" + $StandardProp.PropertyName + "`": {" + "`r`n"
+						}
+						$acCount = 0
+						foreach ($PropKeyValue in $StandardProp.PropertyList) {
+							if ($acCount -gt 0) {
+								$NewMessage += ","
+							}
+							$NewMessage += "`"" + $PropKeyValue.Name + "`": `"" + $PropKeyValue.Value + "`"" + "`r`n"
+							$acCount++
+						}
+						if ($StandardProp.isArray) {
+							$NewMessage += "}]" + "`r`n"
+						}
+						else {
+							$NewMessage += "}" + "`r`n"
+						}
 						
-                    }
-                    "ObjectCollection" {
-                        if ($StandardProp.isArray) {
-                            $NewMessage += "`"" + $StandardProp.PropertyName + "`": [" + "`r`n"
-                        }
-                        else {
-                            $NewMessage += "`"" + $StandardProp.PropertyName + "`": {" + "`r`n"
-                        }
-                        foreach ($EnclosedStandardProp in $StandardProp.PropertyList) {
-                            $NewMessage += "`"" + $EnclosedStandardProp.PropertyName + "`": {" + "`r`n"
-                            foreach ($PropKeyValue in $EnclosedStandardProp.PropertyList) {
-                                $NewMessage += "`"" + $PropKeyValue.Name + "`": `"" + $PropKeyValue.Value + "`"," + "`r`n"
-                            }
-                            $NewMessage += "}" + "`r`n"
-                        }
-                        if ($StandardProp.isArray) {
-                            $NewMessage += "]" + "`r`n"
-                        }
-                        else {
-                            $NewMessage += "}" + "`r`n"
-                        }
-                    }
+					}
+					"ObjectCollection" {
+						if ($StandardProp.isArray) {
+							$NewMessage += "`"" + $StandardProp.PropertyName + "`": [" + "`r`n"
+						}
+						else {
+							$NewMessage += "`"" + $StandardProp.PropertyName + "`": {" + "`r`n"
+						}
+						foreach ($EnclosedStandardProp in $StandardProp.PropertyList) {
+							$NewMessage += "`"" + $EnclosedStandardProp.PropertyName + "`": {" + "`r`n"
+							foreach ($PropKeyValue in $EnclosedStandardProp.PropertyList) {
+								$NewMessage += "`"" + $PropKeyValue.Name + "`": `"" + $PropKeyValue.Value + "`"," + "`r`n"
+							}
+							$NewMessage += "}" + "`r`n"
+						}
+						if ($StandardProp.isArray) {
+							$NewMessage += "]" + "`r`n"
+						}
+						else {
+							$NewMessage += "}" + "`r`n"
+						}
+					}
 					
-                }
-            }
-        }
-        $atcnt = 0
-        $processAttachments = $false
-        if ($Attachments -ne $null) { $processAttachments = $true }
-        if ($ReferanceAttachments -ne $null) { $processAttachments = $true }
-        if ($processAttachments) {
-            if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-            $NewMessage += "  `"Attachments`": [ " + "`r`n"
-            if ($Attachments -ne $null) {
-                foreach ($Attachment in $Attachments) {
-                    if ($atcnt -gt 0) {
-                        $NewMessage += "   ,{" + "`r`n"
-                    }
-                    else {
-                        $NewMessage += "    {" + "`r`n"
-                    }
-                    if ($Attachment.name) {
-                        $NewMessage += "     `"@odata.type`": `"#microsoft.graph.fileAttachment`"," + "`r`n"
-                        $NewMessage += "     `"Name`": `"" + $Attachment.name + "`"," + "`r`n"
-                        $NewMessage += "     `"ContentBytes`": `" " + $Attachment.contentBytes + "`"" + "`r`n"
-                    }
-                    else {
-                        $Item = Get-Item $Attachment
+				}
+			}
+		}
+		$atcnt = 0
+		$processAttachments = $false
+		if ($Attachments -ne $null) { $processAttachments = $true }
+		if ($ReferanceAttachments -ne $null) { $processAttachments = $true }
+		if ($processAttachments) {
+			if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+			$NewMessage += "  `"Attachments`": [ " + "`r`n"
+			if ($Attachments -ne $null) {
+				foreach ($Attachment in $Attachments) {
+					if ($atcnt -gt 0) {
+						$NewMessage += "   ,{" + "`r`n"
+					}
+					else {
+						$NewMessage += "    {" + "`r`n"
+					}
+					if ($Attachment.name) {
+						$NewMessage += "     `"@odata.type`": `"#microsoft.graph.fileAttachment`"," + "`r`n"
+						$NewMessage += "     `"Name`": `"" + $Attachment.name + "`"," + "`r`n"
+						$NewMessage += "     `"ContentBytes`": `" " + $Attachment.contentBytes + "`"" + "`r`n"
+					}
+					else {
+						$Item = Get-Item $Attachment
 
-                        $NewMessage += "     `"@odata.type`": `"#microsoft.graph.fileAttachment`"," + "`r`n"
-                        $NewMessage += "     `"Name`": `"" + $Item.Name + "`"," + "`r`n"
-                        $NewMessage += "     `"ContentBytes`": `" " + [System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Attachment)) + "`"" + "`r`n"
+						$NewMessage += "     `"@odata.type`": `"#microsoft.graph.fileAttachment`"," + "`r`n"
+						$NewMessage += "     `"Name`": `"" + $Item.Name + "`"," + "`r`n"
+						$NewMessage += "     `"ContentBytes`": `" " + [System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Attachment)) + "`"" + "`r`n"
 
-                    }
-                    $NewMessage += "    } " + "`r`n"
-                    $atcnt++
+					}
+					$NewMessage += "    } " + "`r`n"
+					$atcnt++
 					
-                }
-            }
-            $atcnt = 0
-            if ($ReferanceAttachments -ne $null) {
-                foreach ($Attachment in $ReferanceAttachments) {
-                    if ($atcnt -gt 0) {
-                        $NewMessage += "   ,{" + "`r`n"
-                    }
-                    else {
-                        $NewMessage += "    {" + "`r`n"
-                    }
-                    $NewMessage += "     `"@odata.type`": `"#microsoft.graph.referenceAttachment`"," + "`r`n"
-                    $NewMessage += "     `"Name`": `"" + $Attachment.Name + "`"," + "`r`n"
-                    $NewMessage += "     `"SourceUrl`": `"" + $Attachment.SourceUrl + "`"," + "`r`n"
-                    $NewMessage += "     `"ProviderType`": `"" + $Attachment.ProviderType + "`"," + "`r`n"
-                    $NewMessage += "     `"Permission`": `"" + $Attachment.Permission + "`"," + "`r`n"
-                    $NewMessage += "     `"IsFolder`": `"" + $Attachment.IsFolder + "`"" + "`r`n"
-                    $NewMessage += "    } " + "`r`n"
-                    $atcnt++
-                }
-            }
-            $NewMessage += "  ]" + "`r`n"
-        }
+				}
+			}
+			$atcnt = 0
+			if ($ReferanceAttachments -ne $null) {
+				foreach ($Attachment in $ReferanceAttachments) {
+					if ($atcnt -gt 0) {
+						$NewMessage += "   ,{" + "`r`n"
+					}
+					else {
+						$NewMessage += "    {" + "`r`n"
+					}
+					$NewMessage += "     `"@odata.type`": `"#microsoft.graph.referenceAttachment`"," + "`r`n"
+					$NewMessage += "     `"Name`": `"" + $Attachment.Name + "`"," + "`r`n"
+					$NewMessage += "     `"SourceUrl`": `"" + $Attachment.SourceUrl + "`"," + "`r`n"
+					$NewMessage += "     `"ProviderType`": `"" + $Attachment.ProviderType + "`"," + "`r`n"
+					$NewMessage += "     `"Permission`": `"" + $Attachment.Permission + "`"," + "`r`n"
+					$NewMessage += "     `"IsFolder`": `"" + $Attachment.IsFolder + "`"" + "`r`n"
+					$NewMessage += "    } " + "`r`n"
+					$atcnt++
+				}
+			}
+			$NewMessage += "  ]" + "`r`n"
+		}
 		
-        if ($ExPropList -ne $null) {
-            if ($NewMessage.Length -gt 5) { $NewMessage += "," }
-            $NewMessage += "`"SingleValueExtendedProperties`": [" + "`r`n"
-            $propCount = 0
-            foreach ($Property in $ExPropList) {
-                if ($propCount -eq 0) {
-                    $NewMessage += "{" + "`r`n"
-                }
-                else {
-                    $NewMessage += ",{" + "`r`n"
-                }
-                if ($Property.PropertyType -eq "Tagged") {
-                    $NewMessage += "`"Id`":`"" + $Property.DataType + " " + $Property.Id + "`", " + "`r`n"
-                }
-                else {
-                    if ($Property.Type -eq "String") {
-                        $NewMessage += "`"Id`":`"" + $Property.DataType + " " + $Property.Guid + " Name " + $Property.Id + "`", " + "`r`n"
-                    }
-                    else {
-                        $NewMessage += "`"Id`":`"" + $Property.DataType + " " + $Property.Guid + " Id " + $Property.Id + "`", " + "`r`n"
-                    }
-                }
-                if ($Property.Value -eq "null") {
-                    $NewMessage += "`"Value`":null" + "`r`n"
-                }
-                else {
-                    $NewMessage += "`"Value`":`"" + $Property.Value + "`"" + "`r`n"
-                }				
-                $NewMessage += " } " + "`r`n"
-                $propCount++
-            }
-            $NewMessage += "]" + "`r`n"
-        }
-        if (![String]::IsNullOrEmpty($SaveToSentItems)) {
-            $NewMessage += "}   ,`"SaveToSentItems`": `"" + $SaveToSentItems.ToLower() + "`"" + "`r`n"
-        }
-        $NewMessage += "}"
-        if ($ShowRequest.IsPresent) {
-            Write-Host $NewMessage
-        }
-        return, $NewMessage
-    }
+		if ($ExPropList -ne $null) {
+			if ($NewMessage.Length -gt 5) { $NewMessage += "," }
+			$NewMessage += "`"SingleValueExtendedProperties`": [" + "`r`n"
+			$propCount = 0
+			foreach ($Property in $ExPropList) {
+				if ($propCount -eq 0) {
+					$NewMessage += "{" + "`r`n"
+				}
+				else {
+					$NewMessage += ",{" + "`r`n"
+				}
+				if ($Property.PropertyType -eq "Tagged") {
+					$NewMessage += "`"Id`":`"" + $Property.DataType + " " + $Property.Id + "`", " + "`r`n"
+				}
+				else {
+					if ($Property.Type -eq "String") {
+						$NewMessage += "`"Id`":`"" + $Property.DataType + " " + $Property.Guid + " Name " + $Property.Id + "`", " + "`r`n"
+					}
+					else {
+						$NewMessage += "`"Id`":`"" + $Property.DataType + " " + $Property.Guid + " Id " + $Property.Id + "`", " + "`r`n"
+					}
+				}
+				if ($Property.Value -eq "null") {
+					$NewMessage += "`"Value`":null" + "`r`n"
+				}
+				else {
+					$NewMessage += "`"Value`":`"" + $Property.Value + "`"" + "`r`n"
+				}				
+				$NewMessage += " } " + "`r`n"
+				$propCount++
+			}
+			$NewMessage += "]" + "`r`n"
+		}
+		if (![String]::IsNullOrEmpty($SaveToSentItems)) {
+			$NewMessage += "}   ,`"SaveToSentItems`": `"" + $SaveToSentItems.ToLower() + "`"" + "`r`n"
+		}
+		$NewMessage += "}"
+		if ($ShowRequest.IsPresent) {
+			Write-Host $NewMessage
+		}
+		return, $NewMessage
+	}
 }
 
-function Invoke-SMCSelectClientAttachment
-{
+function Invoke-SMCSelectClientAttachment {
 	[CmdletBinding()]
 	Param (
 		
 	)
 	
 	$FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{
-		Multiselect  = $true
+		Multiselect = $true
 	}
 	
 	[void]$FileBrowser.ShowDialog()
-	foreach ($File in $FileBrowser.FileNames)
-	{
+	foreach ($File in $FileBrowser.FileNames) {
 		$script:Attachments += $File
 		$attname += $File + " "
 	}

@@ -11,7 +11,7 @@ function Get-MailBoxFolderFromPath {
     )
 
     process {
-        if($FolderPath -eq '\'){
+        if ($FolderPath -eq '\') {
             return Get-MgUserMailFolder -UserId $MailboxName -MailFolderId msgFolderRoot 
         }
         $fldArray = $FolderPath.Split("\")
@@ -55,25 +55,25 @@ function Invoke-EnumerateMailBoxFolders {
 
     process {
         $Script:Mailboxfolders = @()
-        if($FolderPath){
+        if ($FolderPath) {
             $searchRootFolder = Get-MailBoxFolderFromPath -MailboxName $MailboxName -FolderPath $FolderPath
             Add-Member -InputObject $searchRootFolder -NotePropertyName "FolderPath" -NotePropertyValue $FolderPath
         }
-        if($WellKnownFolder){
+        if ($WellKnownFolder) {
             $searchRootFolder = Get-MgUserMailFolder -UserId $MailboxName -MailFolderId $WellKnownFolder             
         }
-        if($returnSearchRoot){               
+        if ($returnSearchRoot) {               
             $Script:Mailboxfolders += $searchRootFolder
 
         }      
-        if($searchRootFolder){
+        if ($searchRootFolder) {
             Invoke-EnumerateChildMailFolders -MailboxName $MailboxName -folderId $searchRootFolder.id
         }      
         return $Script:Mailboxfolders 
     }
 }
 
-function Invoke-EnumerateChildMailFolders{
+function Invoke-EnumerateChildMailFolders {
     [CmdletBinding()]
     param (
         [Parameter(Position = 0, Mandatory = $true)]
@@ -86,37 +86,44 @@ function Invoke-EnumerateChildMailFolders{
     )
 
     process {
-        $childFolders = Get-MgUserMailFolderChildFolder -UserId $MailboxName -MailFolderId $folderId -All -ExpandProperty "singleValueExtendedProperties(`$filter=id eq 'String 0x66b5')"
+        $childFolders = Get-MgUserMailFolderChildFolder -UserId $MailboxName -MailFolderId $folderId -All -ExpandProperty "singleValueExtendedProperties(`$filter=id eq 'String 0x66b5' or id eq 'Binary 0xfff')"
         Write-Verbose ("Returned " + $childFolders.Count)
-        foreach($childfolder in $childFolders){
+        foreach ($childfolder in $childFolders) {
             Expand-ExtendedProperties -Item $childfolder
             $Script:Mailboxfolders += $childfolder
-            if($childfolder.ChildFolderCount -gt 0){
+            if ($childfolder.ChildFolderCount -gt 0) {
                 Invoke-EnumerateChildMailFolders -MailboxName $MailboxName -folderId $childfolder.id
             }
         }
     }
 }
 
-function Expand-ExtendedProperties
-{
-	[CmdletBinding()] 
+function Expand-ExtendedProperties {
+    [CmdletBinding()] 
     param (
-		[Parameter(Position = 1, Mandatory = $false)]
-		[psobject]
-		$Item
-	)
+        [Parameter(Position = 1, Mandatory = $false)]
+        [psobject]
+        $Item
+    )
 	
- 	process
-	{
-		if ($Item.singleValueExtendedProperties -ne $null)
-		{
-			foreach ($Prop in $Item.singleValueExtendedProperties)
-			{
-				Switch ($Prop.Id)
-				{
+    process {
+        if ($Item.singleValueExtendedProperties -ne $null) {
+            foreach ($Prop in $Item.singleValueExtendedProperties) {
+                Switch ($Prop.Id) {
+                    "String 0x3FFA" {
+                        Add-Member -InputObject $Item -NotePropertyName "lastModifiedUser" -NotePropertyValue $Prop.Value.Replace(" ", "\") -Force
+                    }
+                    "Integer 0x405A" {
+                        Add-Member -InputObject $Item -NotePropertyName "lastModifiedFlags" -NotePropertyValue $Prop.Value.Replace(" ", "\") -Force
+                    }
                     "String 0x66b5"{
-                          Add-Member -InputObject $Item -NotePropertyName "FolderPath" -NotePropertyValue $Prop.Value.Replace(" ","\") -Force
+                        Add-Member -InputObject $Item -NotePropertyName "FolderPath" -NotePropertyValue $Prop.Value.Replace(" ","\") -Force
+                    }
+                    "Binary 0x348A"{                            
+                        Add-Member  -InputObject $Item -NotePropertyName "LastActiveParentEntryId" -NotePropertyValue ([System.BitConverter]::ToString([Convert]::FromBase64String($Prop.Value)).Replace("-",""))
+                    }
+                    "Binary 0xfff" {
+                        Add-Member  -InputObject $Item -NotePropertyName "PR_ENTRYID" -NotePropertyValue ([System.BitConverter]::ToString([Convert]::FromBase64String($Prop.Value)).Replace("-", ""))
                     }
                 }
             }
@@ -124,47 +131,73 @@ function Expand-ExtendedProperties
     }
 }
 
+function Find-ModifiedMessages {	
+    [CmdletBinding()] 
+    param (
+        [Parameter(Position = 1, Mandatory = $false)]
+        [String]
+        $ApplicationClientId,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $ApplicationClientSecret,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [String]
+        $TenantId,
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 5, Mandatory = $false)]
+        [datetime]
+        $StartTime,
+        [Parameter(Position = 6, Mandatory = $false)]
+        [datetime]
+        $Endtime
+    )
 
-# Define the Application (Client) ID and Secret
-$ApplicationClientId = '12928ba2-2b75-4d04-9916-xxxxx' # Application (Client) ID
-$ApplicationClientSecret = 'xxxxxx' # Application Secret Value
-$TenantId = '1c3a18bf-da31-4f6c-a404-xxxx' # Tenant ID
+    process {
+        # Convert the Client Secret to a Secure String
+        $SecureClientSecret = ConvertTo-SecureString -String $ApplicationClientSecret -AsPlainText -Force
 
-# Convert the Client Secret to a Secure String
-$SecureClientSecret = ConvertTo-SecureString -String $ApplicationClientSecret -AsPlainText -Force
+        # Create a PSCredential Object Using the Client ID and Secure Client Secret
+        $ClientSecretCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $ApplicationClientId, $SecureClientSecret
+        # Connect to Microsoft Graph Using the Tenant ID and Client Secret Credential
+        Connect-MgGraph -TenantId $TenantId -ClientSecretCredential $ClientSecretCredential
 
-# Create a PSCredential Object Using the Client ID and Secure Client Secret
-$ClientSecretCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $ApplicationClientId, $SecureClientSecret
-# Connect to Microsoft Graph Using the Tenant ID and Client Secret Credential
-Connect-MgGraph -TenantId $TenantId -ClientSecretCredential $ClientSecretCredential
+        $Filter = "(lastModifiedDateTime ge $($StartTime.ToUniversalTime().ToString("yyyy-MM-ddThh:mm:ssZ"))) and (lastModifiedDateTime le $($Endtime.ToUniversalTime().ToString("yyyy-MM-ddThh:mm:ssZ")))"
 
-$MailboxName = "gscales@datarumble.com"
+        $rptCollection = @()
 
-$StartTime = (Get-Date).AddDays(-14).ToUniversalTime().ToString("yyyy-MM-ddThh:mm:ssZ")
-$Endtime = (Get-Date).AddDays(-7).ToUniversalTime().ToString("yyyy-MM-ddThh:mm:ssZ")
-$Filter = "(lastModifiedDateTime ge $StartTime) and (lastModifiedDateTime le $Endtime)"
-
-$rptCollection = @()
-
-$Folders = Invoke-EnumerateMailBoxFolders -MailboxName $MailboxName -WellKnownFolder msgFolderRoot
-$FolderIndex = New-Object hashtable
-foreach($folder in $Folders){
-    $FolderIndex.Add($folder.Id,$folder.FolderPath)
+        $Folders = Invoke-EnumerateMailBoxFolders -MailboxName $MailboxName -WellKnownFolder msgFolderRoot
+        $LapFidfldIndex = @{};
+        $FolderIndex = New-Object hashtable
+        foreach ($folder in $Folders) {
+            $FolderIndex.Add($folder.Id, $folder.FolderPath)
+            $laFid = $folder.PR_ENTRYID.substring(44,44)
+            $LapFidfldIndex.Add($laFid,$folder);
+        }
+        Write-Verbose $FolderIndex.Values
+        Get-MgUserMessage -PageSize 999 -All -UserId $MailboxName -ExpandProperty "singleValueExtendedProperties(`$filter=id eq 'String 0x3FFA' or id eq 'Integer 0x405A' or id eq 'Binary 0x348A')" -Filter $Filter -Select id, parentFolderId, lastModifiedDateTime, ReceivedDateTime, createdDateTime, Subject | ForEach-Object {
+            $rptObj = "" | Select MailboxName, FolderPath, Subject, ReceivedDateTime, CreatedDateTime, lastModifiedDateTime, lastModifiedUser, lastModifiedFlags, LastActiveParentEntryId, LastActiveParentFolderPath
+            $rptObj.MailboxName = $MailboxName
+            if ($FolderIndex.ContainsKey($_.parentFolderId)) {
+                $rptObj.FolderPath = $FolderIndex[$_.parentFolderId]
+            }  
+            Expand-ExtendedProperties -Item $_  
+            $rptObj.Subject = $_.Subject
+            $rptObj.lastModifiedDateTime = $_.lastModifiedDateTime
+            $rptObj.lastModifiedUser = $_.lastModifiedUser
+            $rptObj.ReceivedDateTime = $_.ReceivedDateTime
+            $rptObj.CreatedDateTime = $_.createdDateTime
+            $rptObj.lastModifiedFlags = $_.lastModifiedFlags
+            if($_.LastActiveParentEntryId){
+                    if($LapFidfldIndex.ContainsKey($_.LastActiveParentEntryId)){
+                        $rptObj.LastActiveParentFolderPath = $LapFidfldIndex[$_.LastActiveParentEntryId].FolderPath 
+                    }
+            }
+            $rptObj.lastActiveParentEntryId = $_.LastActiveParentEntryId
+            $rptCollection += $rptObj    
+        }
+        return $rptCollection 
+    }
 }
 
-Get-MgUserMessage -PageSize 999 -All -UserId $MailboxName -ExpandProperty "singleValueExtendedProperties(`$filter=id eq 'String 0x3FFA')" -Filter $Filter -Select id,parentFolderId,lastModifiedDateTime,ReceivedDateTime,createdDateTime,Subject | ForEach-Object{
-    $rptObj = "" | Select MailboxName,FolderPath,Subject,ReceivedDateTime,CreatedDateTime,lastModifiedDateTime,lastModifiedUser
-    $rptObj.MailboxName = $MailboxName
-    if($FolderIndex.ContainsKey($_.parentFolderId)){
-        $rptObj.FolderPath = $FolderIndex[$_.parentFolderId]
-    }    
-    $rptObj.Subject = $_.Subject
-    $rptObj.lastModifiedDateTime = $_.lastModifiedDateTime
-    if($_.singleValueExtendedProperties -ne $null){
-        $rptObj.lastModifiedUser = $_.singleValueExtendedProperties[0].Value
-    }    
-    $rptObj.ReceivedDateTime = $_.ReceivedDateTime
-    $rptObj.CreatedDateTime = $_.createdDateTime
-    $rptCollection += $rptObj    
-}
-$rptCollection 

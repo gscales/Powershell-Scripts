@@ -7,14 +7,17 @@
    Exports a Contact in an Exchange Online a VCF file 
   
   Requires the Exo Cmdlets
+ 
+  Requires Powershell Graph SDK connected with Scope "ProfilePhoto.Read.All"
+ eg connect-mggraph -Scopes "ProfilePhoto.Read.All
   
 .EXAMPLE
  
-	Example 1 Export a Contact to a VCF file 
-	Export-MGPContactToVcard -FileName 'c:\temp\cc.vcf' -UserId user@contso.com  -ContactId $ContactIdVar
+	Example 1 Export a Recpient to a VCF file 
+	Export-RecipientToVcard -FileName 'c:\temp\cc.vcf' -Identity user@contso.com  
 
-    Example 2 Export a Contact to a VCF file with the Contact Photo (if availble) 
-	Export-MGPContactToVcard -FileName 'c:\temp\cc.vcf' -UserId user@contso.com -ContactId $ContactIdVar -IncludePhoto
+        Example 2 Export a Recpient to a VCF file with the Contact Photo (if availble) 
+	Export-RecipientToVcard -FileName 'c:\temp\cc.vcf' -Identity user@contso.com  -IncludePhoto
 
 #> 
 ########################

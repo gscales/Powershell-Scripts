@@ -3,28 +3,31 @@ function Invoke-ListMailboxFolderItems{
     param (
         [Parameter(Position = 0, Mandatory = $true)] [String]$MailboxId,
         [Parameter(Position = 1, Mandatory = $true)] [String]$MailFolderId,
-        [Parameter(Position = 2, Mandatory = $false)] [String]$ItemCount=10
+        [Parameter(Position = 2, Mandatory = $false)] [String]$ItemCount=10,
+        [Parameter(Position = 3, Mandatory = $false)] [String]$Filter
     )
     Process{
         $ItemsProcessed = 0
         $TopVal = 999
-        if($ItemCount -lt 999){
-            $TopVal = $ItemCount
-        }
         $RequestURL = "https://graph.microsoft.com/beta/admin/exchange/mailboxes/$MailboxId/folders/$MailFolderId/items?`$top=$TopVal&`$expand=singleValueExtendedProperties(`$filter=(id eq 'String 0x0037') or (id eq 'SystemTime 0x0E06'))"
+        if($filter){
+            $RequestURL += "&`$filter=$Filter"
+        }
         do {
-            $Results = Invoke-MgGraphRequest -Method Get -Uri $RequestURL        
+            $Results = Invoke-MgGraphRequest -Method Get -Uri $RequestURL  -Headers @{"Prefer"="IdType=`"ImmutableId`""}     
             $RequestURL  = $null
             if($Results){
+                $RequestURL = $Results.'@odata.nextlink'
+                if($RequestURL){
+                    Write-Verbose $RequestURL
+                }else{
+                    Write-Verbose "No more pages"
+                }                
                 foreach($itemResult in $Results.Value){
                     write-verbose("Processing " + $itemResult.id)
                     Expand-ExtendedProperties -Item $itemResult
                     Write-Output ([PSCustomObject]$itemResult)
-                     $ItemsProcessed++
-                    if($ItemCount -gt 0 -band $ItemsProcessed -gt $ItemCount){
-                         break
-                    }                           
-                    $RequestURL = $Results.'@odata.nextlink'
+                    $ItemsProcessed++                                            
                     if($ItemCount -gt 0 -band $ItemsProcessed -gt $ItemCount){
                        $RequestURL = $null
                        break
@@ -32,7 +35,7 @@ function Invoke-ListMailboxFolderItems{
                     $Results = $null     
                 }  
             }
-        } until (!($RequestURL)) 
+        } until ([String]::IsNullOrEmpty(($RequestURL))) 
     }    
 }
 
@@ -81,24 +84,93 @@ function Invoke-ExportItems{
                 $ExportHash = @{}
                 $ExportHash.Add("itemIds", $ExportBatch)
                 $ExportItemsResult = Invoke-GraphRequest -Uri $ExportUrl -Method Post -Body (ConvertTo-json $ExportHash -Depth 10)
-                foreach($ExportedItem in $ExportItemsResult){
+                foreach($ExportedItem in $ExportItemsResult.value){
+                    Write-Verbose ("Exported " + $ExportedItem.itemId)
                     $fileName = $ExportPath + [Guid]::NewGuid() + ".fts"
                     [IO.File]::WriteAllBytes($fileName, ([Convert]::FromBase64String($ExportedItem.data))) 
                 }
                 $ExportBatch = @()
             }
         }
-        if($ExportBatch.Count -ge 0){
+        if($ExportBatch.Count -gt 0){
             $ExportHash = @{}
             $ExportHash.Add("itemIds", $ExportBatch)
             $ExportItemsResult = Invoke-GraphRequest -Uri $ExportUrl -Method Post -Body (ConvertTo-json $ExportHash -Depth 10)
-            foreach($ExportedItem in $ExportItemsResult.Value){
+            foreach($ExportedItem in $ExportItemsResult.value){
                 $fileName = $ExportPath + [Guid]::NewGuid() + ".fts"
                 [IO.File]::WriteAllBytes($fileName, ([Convert]::FromBase64String($ExportedItem.data))) 
             }
             $ExportBatch = @()
         }
     }
+}
+
+function Invoke-BatchExportItems{
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)] [PsObject]$Items,
+        [Parameter(Position = 1, Mandatory = $true)] [PsObject]$MailboxId,
+        [Parameter(Position = 2, Mandatory = $true)] [String]$ExportPath
+    )
+    Process{
+        $stopwatch =  [system.diagnostics.stopwatch]::StartNew()
+        $Report = "" | Select ItemsExported,ItemErrors,TotalItemSize
+        $Report.ItemsExported = 0
+        $Report.ItemErrors - 0
+        $Report.TotalItemSize = 0
+        $ExportUrl = "/admin/exchange/mailboxes/$MailboxId/exportItems"
+        $ExportBatchs = @()
+        $ExportBatch = @()
+        foreach($Item in $Items){
+            $ExportBatch += $Item.id
+            $Report.TotalItemSize += $Item.size
+            if($ExportBatch.Count -ge 20){
+                $ExportHash = @{}
+                $ExportHash.Add("itemIds", $ExportBatch)
+                $ExportBatchs += $ExportHash
+                $ExportBatch = @()
+            }
+        }
+        if($ExportBatch.Count -gt 0){
+            $ExportHash = @{}
+            $ExportHash.Add("itemIds", $ExportBatch)
+            $ExportBatchs += $ExportHash
+            $ExportBatch = @()
+        }
+        if($ExportBatchs.Count -gt 0){
+            $BatchRequestContent = @{}
+            $BatchRequestContent.add("requests",@())
+            $batchCount = 1
+            foreach($ExportHashBatch in $ExportBatchs){
+                $BatchEntry = @{}
+                $BatchEntry.Add("id",[Int32]$batchCount)
+                $BatchEntry.Add("method","POST")
+                $BatchEntry.Add("url",$ExportUrl) 
+                $BatchEntry.Add("body",$ExportHashBatch)           
+                $BatchHeaders = @{
+                    'Content-Type' =  "application/json"
+                } 
+                $BatchEntry.Add("headers",$BatchHeaders)
+                $BatchRequestContent["requests"] += $BatchEntry
+                if($batchCount -ge 20){
+                    Invoke-BatchPost -BatchRequestContent $BatchRequestContent -ExportPath $ExportPath -Report $Report
+                    $BatchRequestContent = @{}
+                    $BatchRequestContent.add("requests",@())
+                    $batchCount = 0
+                }
+                $batchCount++
+            }
+        }
+        if($batchCount -ge 0){
+            Invoke-BatchPost -BatchRequestContent $BatchRequestContent -ExportPath $ExportPath -Report $Report
+            $BatchRequestContent = @{}
+            $BatchRequestContent.add("requests",@())
+            $batchCount = 0
+        }
+        Write-Verbose ($stopwatch.Elapsed.TotalMinutes)
+        return $Report
+    }
+    
 }
 
 function Invoke-GetMailboxSettings{
@@ -127,8 +199,7 @@ function Expand-ExtendedProperties
 		if ($Item.singleValueExtendedProperties -ne $null)
 		{
 			foreach ($Prop in $Item.singleValueExtendedProperties)
-			{
-                write-verbose("Processing " + $Prop.Id)
+			{                
 				Switch ($Prop.Id)
 				{
                     "String 0x37"{
@@ -268,3 +339,70 @@ function Invoke-ConvertToStringFromExchange($ipInputString) {
     }  
     return $Val1Text  
 } 
+
+function Invoke-BatchPost{
+    param (
+        [Parameter(Position = 1, Mandatory = $true)]
+        [PSObject]
+        $BatchRequestContent,
+        [Parameter(Position = 2, Mandatory = $true)] 
+        [String]$ExportPath,
+        [Parameter(Position = 3, Mandatory = $true)] 
+        [psobject]$Report
+
+    )
+    Process{
+        $RequestURL = "https://graph.microsoft.com/beta/`$batch"
+        $BatchResponse = Invoke-MgGraphRequest -Method POST -Uri $RequestURL -Body (ConvertTo-json  $BatchRequestContent -depth 10 -Compress)        
+        if($BatchResponse.responses){
+            foreach($Response in $BatchResponse.responses){                        
+                if([Int32]$Response.status -eq 200){
+                     Write-Verbose "Good Request"
+                     $ExportedItemsResponse = $Response.body["value"]
+                     foreach($ExportedItem in $ExportedItemsResponse){                        
+                        if($ExportedItem.error){
+                            Write-Verbose ("Error in Export" + $ExportedItem.error)
+                            $Report.ItemErrors++
+                        }else{
+                            $fileName = $ExportPath + [Guid]::NewGuid() + ".fts"
+                            [IO.File]::WriteAllBytes($fileName, ([Convert]::FromBase64String($ExportedItem.data)))
+                            Write-Verbose("Exported " + $fileName)                            
+                            $Report.ItemsExported++
+                        } 
+                    }
+                }else{
+                     Write-Verbose $Response.status
+                }
+           }
+        } 
+    }
+}
+
+
+function Invoke-UploadItem{
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]
+        $FolderId,
+		
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $ImportURL,
+
+        [Parameter(Position = 2, Mandatory = $true)]
+        [String]
+        $FileName
+
+    )
+    Process{
+        $Request = @{}
+        $Request.Add("FolderId",$FolderId)
+        $Request.Add("Mode","create")
+        $Request.Add("Data", [Convert]::ToBase64String([IO.File]::ReadAllBytes($FileName)))
+        Return Invoke-WebRequest -method post -Uri $ImportURL -Body (ConvertTo-Json $Request -Depth 10) -ContentType "application/json"
+
+    }
+        
+
+}

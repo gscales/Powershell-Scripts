@@ -47,14 +47,61 @@ function Invoke-ImportMailboxItem{
         [Parameter(Position = 2, Mandatory = $true)] [string]$FolderId
     )
     Process{
+        $Items = @()        
         $ImportPost = @{}
         $ImportPost.Add("FolderId",$FolderId)
         $ImportPost.Add("Mode","create")
         $ImportPost.Add("Data",[Convert]::ToBase64String([IO.File]::ReadAllBytes($FileName)))
-        $CreateImportSession = Invoke-GraphRequest -Uri $ImportURL -Method Post -Body (ConvertTo-json $ImportPost -Depth 10)
-        return $CreateImportSession
+        $Items += $ItemPost
+        $result = Invoke-GraphRequest -Uri $ImportURL -Method Post -Body (ConvertTo-json $Items -Depth 10)
+        Write-Verbose $result.StatusCode
+        
     }
 }
+
+function Invoke-ImportItemFromDirectory{
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)] [string]$ImportURL,
+        [Parameter(Position = 1, Mandatory = $true)] [string]$FolderName,
+        [Parameter(Position = 2, Mandatory = $true)] [string]$FolderId
+    )
+    Process{
+        $StartTime = Get-Date
+        $report = "" | select NumberOfItems, TotalSize, ElapsedSeconds, Speed, Rate, ErrorCount, Errors
+        $report.NumberOfItems = 0 
+        $report.TotalSize = 0 
+        $report.ElapsedSeconds = 0 
+        $report.Speed = 0 
+        $report.ErrorCount = 0 
+        $report.Errors = @()
+        $webSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+        $BytesImported = 0;
+        $stopwatch =  [system.diagnostics.stopwatch]::StartNew()
+        Get-ChildItem $FolderName  -Filter *.fts | 
+        Foreach-Object {
+            Write-Verbose $_.FullName
+            Invoke-UploadItem -FileName $_.FullName -FolderId $FolderId -ImportURL $ImportURL -webSession $webSession -Report $report
+            $BytesImported += $_.Length
+            $report.NumberOfItems++
+            $report.TotalSize += $_.Length
+            Write-Verbose ($BytesImported)
+            Write-Verbose ($stopwatch.Elapsed.TotalSeconds)       
+        }  
+        $EndTime = Get-Date  
+        $span = New-TimeSpan -Start $StartTime -end $EndTime    
+        $report.ElapsedSeconds = $span.TotalSeconds
+        $UploadSize = [Math]::Round(($report.TotalSize / 1Mb),2)
+        $UploadTimeSec = $span.TotalSeconds
+        $UploadSpeed = [Math]::Round((($UploadSize / $UploadTimeSec) * 8),2)
+        $timeInHours = $UploadTimeSec / 3600
+        $uploadRateMBPerHour = [Math]::Round(($UploadSize / $timeInHours),2)
+        $report.Rate = "Upload Rate: $uploadRateMBPerHour MB per hour"
+        $report.Speed = $UploadSpeed 
+        return $report
+    }
+}
+
 
 function Invoke-CreateImportSession{
     [CmdletBinding()]
@@ -104,6 +151,39 @@ function Invoke-ExportItems{
         }
     }
 }
+
+function Get-FolderFromPath {
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [string]
+        $FolderPath,
+		
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName
+    )
+
+    process {
+        
+        $fldArray = $FolderPath.Split("\")
+        #Loop through the Split Array and do a Search for each level of folder 
+        $folderId = "MsgFolderRoot"
+        for ($lint = 1; $lint -lt $fldArray.Length; $lint++) {
+            #Perform search based on the displayname of each folder level
+            $FolderName = $fldArray[$lint];
+            $tfTargetFolder = Get-MgUserMailFolderChildFolder -UserId $MailboxName -Filter "DisplayName eq '$FolderName'" -MailFolderId $folderId -All 
+            if ($tfTargetFolder.displayname -match $FolderName) {
+                $folderId = $tfTargetFolder.Id.ToString()
+            }
+            else {
+                throw ("Folder Not found")
+            }
+        }
+        return $tfTargetFolder 
+    }
+}
+
 
 function Invoke-BatchExportItems{
     [CmdletBinding()]
@@ -392,16 +472,54 @@ function Invoke-UploadItem{
 
         [Parameter(Position = 2, Mandatory = $true)]
         [String]
-        $FileName
+        $FileName,
 
+        [Parameter(Position = 3, Mandatory = $true)]
+        [Microsoft.PowerShell.Commands.WebRequestSession]
+        $WebSession,
+
+        [Parameter(Position = 4, Mandatory = $true)]
+        [PSObject]
+        $Report,
+
+        [Parameter(Position = 5, Mandatory = $true)]
+        [int]
+        $RetryCount
     )
     Process{
-        $Request = @{}
-        $Request.Add("FolderId",$FolderId)
-        $Request.Add("Mode","create")
-        $Request.Add("Data", [Convert]::ToBase64String([IO.File]::ReadAllBytes($FileName)))
-        Return Invoke-WebRequest -method post -Uri $ImportURL -Body (ConvertTo-Json $Request -Depth 10) -ContentType "application/json"
+        try{
+            $Request = @{}
+            $Request.Add("FolderId",$FolderId)
+            $Request.Add("Mode","create")
+            $Request.Add("Data", [Convert]::ToBase64String([IO.File]::ReadAllBytes($FileName)))
+            $result = Invoke-WebRequest -method post -Uri $ImportURL -Body (ConvertTo-Json $Request -Depth 10) -ContentType "application/json" -WebSession $webSession  
+            if($result.StatusCode -ne 200){
+                $report.ErrorCount++                
+            } 
+        }catch{
+            Write-Verbose("####Error")           
+            $result = $_.Exception.Response
+			Write-Verbose("Status Code : " + [int]$result.StatusCode) 
+            $report.ErrorCount++ 
+            if([int]$result.StatusCode -eq 429){
+                if($result.Headers["Retry-After"]){
+                    Write-Verbose ("Sleep for " + $result.Headers["Retry-After"])
+                    Start-Sleep -Seconds $result.Headers["Retry-After"]
+                    $RetryCount++
+                    if($RetryCount -le 3){
+                        Invoke-UploadItem -FolderId $FolderId -ImportURL $ImportURL -FileName $FileName -WebSession $WebSession -Report $Report -RetryCount $RetryCount
+                    }else{
+                        Write-Verbose "Retry Count Exceeded"
+                    }
+                    
+                }
+            }
+            if([int]$result.StatusCode -eq 401){
+                Write-Verbose("####Auth errors")  
+            }         
+        }
 
+        
     }
         
 

@@ -28,7 +28,7 @@ function Invoke-ListMailboxFolderItems{
                     Expand-ExtendedProperties -Item $itemResult
                     Write-Output ([PSCustomObject]$itemResult)
                     $ItemsProcessed++                                            
-                    if($ItemCount -gt 0 -band $ItemsProcessed -gt $ItemCount){
+                    if($ItemCount -gt 0 -band $ItemsProcessed -ge $ItemCount){
                        $RequestURL = $null
                        break
                     }
@@ -81,7 +81,7 @@ function Invoke-ImportItemFromDirectory{
         Get-ChildItem $FolderName  -Filter *.fts | 
         Foreach-Object {
             Write-Verbose $_.FullName
-            Invoke-UploadItem -FileName $_.FullName -FolderId $FolderId -ImportURL $ImportURL -webSession $webSession -Report $report
+            Invoke-UploadItem -FileName $_.FullName -FolderId $FolderId -ImportURL $ImportURL -webSession $webSession -Report $report -RetryCount 0
             $BytesImported += $_.Length
             $report.NumberOfItems++
             $report.TotalSize += $_.Length
@@ -152,16 +152,14 @@ function Invoke-ExportItems{
     }
 }
 
-function Get-FolderFromPath {
+function Invoke-GetMailboxFolderFromPath {
     [CmdletBinding()]
     param (
         [Parameter(Position = 0, Mandatory = $true)]
         [string]
         $FolderPath,
 		
-        [Parameter(Position = 1, Mandatory = $true)]
-        [String]
-        $MailboxName
+        [Parameter(Position = 1, Mandatory = $true)] [PsObject]$MailboxId
     )
 
     process {
@@ -172,7 +170,7 @@ function Get-FolderFromPath {
         for ($lint = 1; $lint -lt $fldArray.Length; $lint++) {
             #Perform search based on the displayname of each folder level
             $FolderName = $fldArray[$lint];
-            $tfTargetFolder = Get-MgUserMailFolderChildFolder -UserId $MailboxName -Filter "DisplayName eq '$FolderName'" -MailFolderId $folderId -All 
+            $tfTargetFolder = Invoke-GetMailboxChildFolder -MailboxId $MailboxId -ParentFolderId $folderId -ChildFolderName $FolderName 
             if ($tfTargetFolder.displayname -match $FolderName) {
                 $folderId = $tfTargetFolder.Id.ToString()
             }
@@ -303,6 +301,43 @@ function Expand-ExtendedProperties
         }
     }
 }
+
+function Invoke-GetMailboxFolder{
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)] [String]$MailboxId,
+        [Parameter(Position = 1, Mandatory = $true)] [String]$FolderId="MsgFolderRoot"
+        
+    )
+    Process{
+        $RequestURL = "https://graph.microsoft.com/beta/admin/exchange/mailboxes/$MailboxId/folders/$FolderId"
+        $Results = Invoke-MgGraphRequest -Method Get -Uri $RequestURL        
+        return $Results
+    }    
+}
+
+function Invoke-GetMailboxChildFolder{
+    [CmdletBinding()]
+    param (
+        [Parameter(Position = 0, Mandatory = $true)] [String]$MailboxId,
+        [Parameter(Position = 1, Mandatory = $true)] [String]$ParentFolderId,
+        [Parameter(Position = 2, Mandatory = $true)] [String]$ChildFolderName
+        
+    )
+    Process{
+        $expandval = "`$expand=singleValueExtendedProperties(`$filter=(id eq 'String 0x66b5') or (id eq 'SystemTime 0x3007') or (id eq 'Integer 0x3601'))"
+        $RequestURL = "https://graph.microsoft.com/beta/admin/exchange/mailboxes/$MailboxId/folders/$ParentFolderId/childFolders`?`$Filter = DisplayName eq '$ChildFolderName'&$expandval"
+        $Results = Invoke-MgGraphRequest -Method Get -Uri $RequestURL  
+        if($Results){
+            foreach($itemResult in $Results.Value){
+                write-verbose("Processing " + $itemResult.id)
+                Expand-ExtendedProperties -Item $itemResult
+                Write-Output ([PSCustomObject]$itemResult)      
+            }  
+        }      
+    }    
+}
+
 
 function Invoke-GetMailboxFolders{
     [CmdletBinding()]

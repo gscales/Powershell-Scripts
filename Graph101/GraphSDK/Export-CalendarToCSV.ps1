@@ -15,9 +15,7 @@ function Export-GSdkCalendarToCSV {
 	.PARAMETER MailboxName
 		A description of the MailboxName parameter.
 	
-	.PARAMETER ClientId
-		ClientId for the Azure Applicaiton registration 
-	
+		
 	.PARAMETER StartTime
 	   Start Time to Start searching for Appointments to Export
 	
@@ -29,22 +27,11 @@ function Export-GSdkCalendarToCSV {
 	
 	.PARAMETER FileName
 		File to Export the Calendar Appointments to
-
-    .PARAMETER CertificateFilePath
-		File path for the certificate used for Authentication 
-    
-    .PARAMETER CertificatePassword 
-
-        Password for Certificate File    
 	
 	.EXAMPLE
         Export the last years Calendar appointments to a CSV
-        Export-GCECalendarToCSV -MailboxName gscales@datarumble.com -StartTime (Get-Date).AddYears(-1) -EndTime (Get-Date) -FileName c:\export\lastyear.csv
-
-        Export the last years Calendar appointments to a CSV using certificate Authenticaiton
-
-        $certPassword = ConvertTo-SecureString -String "1234xxxx" -Force -AsPlainText
-         Export-GCECalendarToCSV -MailboxName gscales@datarumble.com -StartTime (Get-Date).AddYears(-1) -EndTime (Get-Date) -FileName c:\export\lastyear.csv -CertificateFilePath c:\temp\cert.pfx -CertificatePassword $certPassword -ClientId 6bedba33-c26f-4e7b-a262-35ef4592fa7b
+        Export-GSdkCalendarToCSV -MailboxName gscales@datarumble.com -StartTime (Get-Date).AddYears(-1) -EndTime (Get-Date) -FileName c:\export\lastyear.csv
+       
 	
 	
 #>

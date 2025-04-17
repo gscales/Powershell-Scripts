@@ -91,7 +91,7 @@ function Invoke-GSdkExportCalendar {
         $events = Get-MgUserCalendarView -UserId $MailboxName -Headers $headers -StartDateTime $queryStartTime -EndDateTime $queryEndTime -PageSize 500 -All -ExpandProperty "SingleValueExtendedProperties(`$filter=(Id eq 'Integer {00062002-0000-0000-C000-000000000046} Id 0x8213') or (Id eq 'Integer {00062002-0000-0000-C000-000000000046} Id 0x8217'))"
         foreach ($CalendarEvent in $events) {
             Expand-ExtendedProperties -Item $CalendarEvent
-            $rptObj = "" | Select StartTime, EndTime, Duration, Type, Subject, Location, Organizer, Attendees, Resources, AppointmentState, Notes, HasAttachments, IsReminderSet
+            $rptObj = "" | Select StartTime, EndTime, Duration, Type, Subject, Location, Organizer, AttendeeCount, Attendees, Resources, AppointmentState, Notes, HasAttachments, IsReminderSet
             $rptObj.HasAttachments = $false;
             $rptObj.IsReminderSet = $false
             $rptObj.StartTime = ([DateTime]$CalendarEvent.Start.dateTime).ToString("yyyy-MM-dd HH:mm")  
@@ -102,11 +102,13 @@ function Invoke-GSdkExportCalendar {
             $rptObj.Location = $CalendarEvent.Location.displayName
             $rptObj.Organizer = $CalendarEvent.organizer.emailAddress.address
             $aptStat = "";
+            $AttendeeCount = 0
             $AppointmentState.Keys | where { $_ -band $CalendarEvent.AppointmentState } | foreach { $aptStat += $AppointmentState.Get_Item($_) + " " }
             $rptObj.AppointmentState = $aptStat	
             if ($CalendarEvent.hasAttachments) { $rptObj.HasAttachments = $CalendarEvent.hasAttachments }
             if ($CalendarEvent.IsReminderSet) { $rptObj.IsReminderSet = $CalendarEvent.IsReminderSet }               
             foreach ($attendee in $CalendarEvent.attendees) {
+                $AttendeeCount++
                 if ($attendee.type -eq "resource") {
                     $rptObj.Resources += $attendee.emailaddress.address + " " + $attendee.type + " " + $attendee.status.response + ";"
                 }
@@ -115,6 +117,91 @@ function Invoke-GSdkExportCalendar {
                     $rptObj.Attendees += $atn
                 }
             }
+            $rptObj.AttendeeCount = $AttendeeCount
+            $rptObj.Notes = $CalendarEvent.Body.content
+            $rptCollection += $rptObj
+        }  
+   
+        return $rptCollection
+		
+    }
+}
+
+function Export-GSdkMasterRecurrencesToCalendarToCSV {
+    [CmdletBinding()]    
+    param (   
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 4, Mandatory = $false)]
+        [String]
+        $TimeZone,
+        [Parameter(Position = 5, Mandatory = $true)]
+        [String]
+        $FileName
+    )
+    Process {  
+        $Events = Invoke-GSdkGetMasterRecurrencesFromCalendar -MailboxName $MailboxName -TimeZone $TimeZone 
+        $Events | Export-Csv -NoTypeInformation -Path $FileName
+        Write-Verbose("Exported to " + $FileName)
+    }
+}
+function Invoke-GSdkGetMasterRecurrencesFromCalendar {
+    [CmdletBinding()]
+    param (       
+        [Parameter(Position = 1, Mandatory = $true)]
+        [String]
+        $MailboxName,
+        [Parameter(Position = 2, Mandatory = $false)]
+        [String]
+        $TimeZone       
+
+    )
+    Begin {  
+        $rptCollection = @()
+        if ([String]::IsNullOrEmpty($TimeZone)) {
+            $TimeZone = [TimeZoneInfo]::Local.Id;
+        }
+        $AppointmentState = @{0 = "None" ; 1 = "Meeting" ; 2 = "Received" ; 4 = "Canceled" ; }
+
+        $headers = @{
+            "Prefer" = "outlook.timezone=`"" + $TimeZone + "`", outlook.body-content-type='text'"
+        }
+        $filter = "singleValueExtendedProperties/Any(ep: ep/id eq 'Boolean {00062002-0000-0000-C000-000000000046} Id 0x8223' and cast(ep/value, Edm.Boolean) eq true)"
+        $expandProps = "SingleValueExtendedProperties(`$filter=(Id eq 'Integer {00062002-0000-0000-C000-000000000046} Id 0x8213') or (Id eq 'Integer {00062002-0000-0000-C000-000000000046} Id 0x8217') "
+        $expandProps += "or (Id eq 'SystemTime {00062002-0000-0000-C000-000000000046} Id 0x8236') or (Id eq 'SystemTime {00062002-0000-0000-C000-000000000046} Id 0x8235'))"
+        $events = Get-MgUserCalendarEvent -UserId $MailboxName -CalendarId Calendar -Headers $headers -filter $filter -PageSize 500 -All -ExpandProperty $expandProps
+        foreach ($CalendarEvent in $events) {
+            Expand-ExtendedProperties -Item $CalendarEvent
+            $rptObj = "" | Select ClipStart, ClipEnd, Duration, RecurrenceRangeType, RecurrencePatternType, AttendeeCount, Type, Subject, Location, Organizer, Attendees, Resources, AppointmentState, Notes, HasAttachments, IsReminderSet
+            $rptObj.HasAttachments = $false;
+            $rptObj.IsReminderSet = $false
+            $rptObj.ClipStart = $CalendarEvent.ClipStart  
+            $rptObj.ClipEnd = $CalendarEvent.ClipEnd
+            $rptObj.Duration = $CalendarEvent.AppointmentDuration
+            $rptObj.Subject = $CalendarEvent.Subject   
+            $rptObj.Type = $CalendarEvent.type
+            $rptObj.RecurrenceRangeType = $CalendarEvent.Recurrence.Range.Type
+            $rptObj.RecurrencePatternType = $CalendarEvent.Recurrence.Pattern.Type
+            $rptObj.Location = $CalendarEvent.Location.displayName
+            $rptObj.Organizer = $CalendarEvent.organizer.emailAddress.address
+            $AttendeeCount = 0
+            $aptStat = "";
+            $AppointmentState.Keys | where { $_ -band $CalendarEvent.AppointmentState } | foreach { $aptStat += $AppointmentState.Get_Item($_) + " " }
+            $rptObj.AppointmentState = $aptStat	
+            if ($CalendarEvent.hasAttachments) { $rptObj.HasAttachments = $CalendarEvent.hasAttachments }
+            if ($CalendarEvent.IsReminderSet) { $rptObj.IsReminderSet = $CalendarEvent.IsReminderSet }               
+            foreach ($attendee in $CalendarEvent.attendees) {
+                $AttendeeCount++
+                if ($attendee.type -eq "resource") {
+                    $rptObj.Resources += $attendee.emailaddress.address + " " + $attendee.type + " " + $attendee.status.response + ";"
+                }
+                else {
+                    $atn = $attendee.emailaddress.address + " " + $attendee.type + " " + $attendee.status.response + ";"
+                    $rptObj.Attendees += $atn
+                }
+            }
+            $rptObj.AttendeeCount = $AttendeeCount
             $rptObj.Notes = $CalendarEvent.Body.content
             $rptCollection += $rptObj
         }  
@@ -141,7 +228,13 @@ function Expand-ExtendedProperties {
                     }
                     "Integer {00062002-0000-0000-c000-000000000046} Id 0x8217" {
                         Add-Member -InputObject $Item -NotePropertyName "AppointmentState" -NotePropertyValue $Prop.Value -Force
-                    }                    
+                    }
+                    "SystemTime {00062002-0000-0000-C000-000000000046} Id 0x8236"{
+                        Add-Member -InputObject $Item -NotePropertyName "ClipEnd" -NotePropertyValue $Prop.Value -Force
+                    } 
+                    "SystemTime {00062002-0000-0000-C000-000000000046} Id 0x8235"{
+                        Add-Member -InputObject $Item -NotePropertyName "ClipStart" -NotePropertyValue $Prop.Value -Force
+                    }                     
                 }
             }
         }

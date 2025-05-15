@@ -6,17 +6,43 @@ function Invoke-GetReactionDetailsForMessages {
         [Parameter(Position = 1, Mandatory = $false)]
         [String] $FolderId="Inbox",
         [Parameter(Position = 2, Mandatory = $false)]
-        [DateTime] $StartTime
+        [DateTime] $StartTime,
+        [Parameter(Position = 3, Mandatory = $false)]
+        [switch] $OwnerOnly
 
     )
 Process{
         $ExpandProperty = "singleValueExtendedProperties(`$filter=(id eq 'SystemTime {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name OwnerReactionTime') or (id eq 'String {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name OwnerReactionType')" 
         $ExpandProperty += "or (id eq 'Binary {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name ReactionsSummary') or (id eq 'Integer {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name ReactionsCount') or (id eq 'Binary {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name ReactionsHistory'))"
-        $filter = "singleValueExtendedProperties/any(ep: ep/id eq 'Integer {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name ReactionsCount' and cast(ep/value, Edm.Int32) gt 0)"
+        if($OwnerOnly){
+            $filter = "singleValueExtendedProperties/any(ep: ep/id eq 'String {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name OwnerReactionType' and ep/value ne null)"
+        }else{
+            $filter = "singleValueExtendedProperties/any(ep: ep/id eq 'Integer {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name ReactionsCount' and cast(ep/value, Edm.Int32) gt 0)"
+        }       
         if($StartTime){
             $filter =  "($filter) And (receivedDateTime gt " + $StartTime.ToString("yyyy-MM-dd") + "T00:00:00Z)"
          }
-        $Messages = Get-MgUserMailFolderMessage -MailFolderId $FolderId -UserId $MailboxName -All -PageSize 999 -Select "Subject,receivedDateTime,singleValueExtendedProperties"  -ExpandProperty $ExpandProperty -Filter $filter 
+        $Messages = Get-MgUserMailFolderMessage -MailFolderId $FolderId -UserId $MailboxName -All -PageSize 999 -Select "Subject,receivedDateTime,singleValueExtendedProperties,InternetMessageId"  -ExpandProperty $ExpandProperty -Filter $filter 
+        foreach($Message in $Messages){
+            Expand-ExtendedProperties -Item $Message
+            Write-Output $Message
+        }    
+    }
+}
+
+function Invoke-GetReactionsDetailsOnMessage {
+    [CmdletBinding()] 
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [String] $MailboxName,
+        [Parameter(Position = 1, Mandatory = $false)]
+        [String] $MessageId
+    )
+Process{
+        $ExpandProperty = "singleValueExtendedProperties(`$filter=(id eq 'SystemTime {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name OwnerReactionTime') or (id eq 'String {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name OwnerReactionType')" 
+        $ExpandProperty += "or (id eq 'Binary {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name ReactionsSummary') or (id eq 'Integer {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name ReactionsCount') or (id eq 'Binary {41F28F13-83F4-4114-A584-EEDB5A6B0BFF} name ReactionsHistory'))"
+        $filter = "internetMessageId eq '$MessageId'"
+        $Messages = Get-MgUserMessage -UserId $MailboxName -All -PageSize 999 -Select "Subject,receivedDateTime,singleValueExtendedProperties,InternetMessageId"  -ExpandProperty $ExpandProperty -Filter $filter 
         foreach($Message in $Messages){
             Expand-ExtendedProperties -Item $Message
             Write-Output $Message

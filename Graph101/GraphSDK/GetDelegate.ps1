@@ -54,21 +54,22 @@ function Invoke-TranslateId {
 
     )  
     Process {
+        Add-Type -AssemblyName System.Web
         if (![String]::IsNullOrEmpty($Base64FolderIdToTranslate)) {
             $HexEntryId = [System.BitConverter]::ToString([Convert]::FromBase64String($Base64FolderIdToTranslate)).Replace("-", "").Substring(2)  
             $HexEntryId = $HexEntryId.SubString(0, ($HexEntryId.Length - 2))
         }
-        $FolderIdBytes = [byte[]]::new($HexEntryId.Length / 2)
+        $IdBytes = [byte[]]::new($HexEntryId.Length / 2)
         For ($i = 0; $i -lt $HexEntryId.Length; $i += 2) {
-            $FolderIdBytes[$i / 2] = [convert]::ToByte($HexEntryId.Substring($i, 2), 16)
+            $IdBytes[$i / 2] = [convert]::ToByte($HexEntryId.Substring($i, 2), 16)
         }
 
-        $FolderIdToConvert = [System.Web.HttpServerUtility]::UrlTokenEncode($FolderIdBytes)
+        $IdToConvert = ConvertTo-UrlToken -BytesInput $IdBytes
 
         $ConvertRequest = @"
 {
     "inputIds" : [
-      "$FolderIdToConvert"
+      "$IdToConvert"
     ],
     "sourceIdType": "entryId",
     "targetIdType": "restId"
@@ -80,12 +81,68 @@ function Invoke-TranslateId {
     }
 }
 
+function ConvertTo-UrlToken {
+    [CmdletBinding(DefaultParameterSetName='String')]
+    param(
+        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true, ParameterSetName='String')]
+        [string]$StringInput,
+
+        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true, ParameterSetName='Bytes')]
+        [byte[]]$BytesInput,
+
+        [string]$Encoding = 'UTF8'
+    )
+    
+    begin {
+        # Check if we are running in an older environment that might require loading the assembly
+        # Not strictly needed in modern PS but good practice for compatibility.
+        # Add-Type -AssemblyName System.Web # Uncomment if you need other System.Web functions
+    }
+
+    process {
+        # 1. Convert String to Bytes if necessary
+        if ($PSCmdlet.ParameterSetName -eq 'String') {
+            $bytes = [System.Text.Encoding]::GetEncoding($Encoding).GetBytes($StringInput)
+        } else {
+            $bytes = $BytesInput
+        }
+        
+        if ($bytes.Length -eq 0) {
+            return ""
+        }
+
+        # 2. Standard Base64 Encoding
+        $base64Str = [System.Convert]::ToBase64String($bytes)
+        
+        # 3. Find padding characters ('=')
+        $endPos = $base64Str.Length
+        $numPadChars = 0
+
+        # Loop backwards to count padding characters
+        for ($i = $base64Str.Length - 1; $i -ge 0; $i--) {
+            if ($base64Str[$i] -eq '=') {
+                $endPos--
+                $numPadChars++
+            } else {
+                break
+            }
+        }
+
+        # 4. Perform replacements and remove padding
+        $token = $base64Str.Substring(0, $endPos)
+        $token = $token.Replace('+', '-') # Replace '+' with '-'
+        $token = $token.Replace('/', '_') # Replace '/' with '_'
+
+        # 5. Append the padding count (0, 1, or 2) as the last character
+        $token + $numPadChars.ToString()
+    }
+}
 <#
 .SYNOPSIS
 Retrieves mailbox folder permissions by calling the new Exchange admin API and returns a lookup hashtable keyed by user.
 
 .DESCRIPTION
-Get-FolderPermissions uses an Outlook/Exchange admin API endpoint to run a Get-MailboxFolderPermission style operation for the
+Get-DelegateFolderPermissions uses an Outlook/Exchange admin API endpoint to run a Get-MailboxFolderPermission style operation for the
 specified mailbox and folder. It constructs the admin API URL using the tenant discovered from the mailbox's domain and will
 use a provided AccessToken or call Get-EntraToken to obtain one. The function sets headers including X-AnchorMailbox and
 posts the CmdletInput body to retrieve permission entries. Results are returned in a hashtable where each key is the user
@@ -109,18 +166,18 @@ A hashtable mapping permission user identifiers (keys) to the permission objects
 
 .EXAMPLE
 # Get calendar permissions for a mailbox using an already-obtained token
-Get-FolderPermissions -MailboxName 'user@contoso.com' -FolderName Calendar -AccessToken $token
+Get-DelegateFolderPermissions -MailboxName 'user@contoso.com' -FolderName Calendar -AccessToken $token
 
 .EXAMPLE
 # Get permissions using service principal anchor
-Get-FolderPermissions -MailboxName 'user@contoso.com' -FolderName Inbox -UseServicePrincipal
+Get-DelegateFolderPermissions -MailboxName 'user@contoso.com' -FolderName Inbox -UseServicePrincipal
 
 .NOTES
 - This function calls a legacy Outlook/Exchange admin API endpoint; appropriate admin privileges and API access are required.
 - If AccessToken is not provided the function will call Get-EntraToken; ensure that helper exists and returns a valid token.
 - The returned permission objects reflect the structure returned by the admin API and may include properties like AccessRights and SharingPermissionFlags.
 #>
-function Get-FolderPermissions {
+function Get-DelegateFolderPermissions {
     [CmdletBinding()] 
     param( 
         [Parameter(Position = 1, Mandatory = $true)]
@@ -375,7 +432,7 @@ Get-O365Delegate -MailboxName 'user@contoso.com' -UseServicePrincipal
 Get-O365Delegate -MailboxName 'user@contoso.com' -AccessToken $token -UseServicePrincipal
 
 .NOTES
-- This function depends on Get-FolderPermissions and Get-LocalFreeBusyObject; ensure those helpers are available and functioning.
+- This function depends on Get-DelegateFolderPermissions and Get-LocalFreeBusyObject; ensure those helpers are available and functioning.
 - Requires appropriate permissions to read mailbox folder permissions and message extended properties.
 - The final objects are suitable for programmatic consumption (exporting, filtering, further automation).
 - When using a service principal, ensure proper application permissions are granted (e.g., Mail.ReadWrite, Calendars.ReadWrite).
@@ -405,12 +462,12 @@ function Get-O365Delegate {
         }
     
         # Retrieve folder permissions for all relevant folders
-        $CalendarPermissions = Get-FolderPermissions @folderParams -FolderName Calendar
-        $InboxPermissions = Get-FolderPermissions @folderParams -FolderName Inbox
-        $TasksPermissions = Get-FolderPermissions @folderParams -FolderName Tasks
-        $ContactsPermissions = Get-FolderPermissions @folderParams -FolderName Contacts
-        $NotesPermissions = Get-FolderPermissions @folderParams -FolderName Notes
-        $JournalPermissions = Get-FolderPermissions @folderParams -FolderName Journal
+        $CalendarPermissions = Get-DelegateFolderPermissions @folderParams -FolderName Calendar
+        $InboxPermissions = Get-DelegateFolderPermissions @folderParams -FolderName Inbox
+        $TasksPermissions = Get-DelegateFolderPermissions @folderParams -FolderName Tasks
+        $ContactsPermissions = Get-DelegateFolderPermissions @folderParams -FolderName Contacts
+        $NotesPermissions = Get-DelegateFolderPermissions @folderParams -FolderName Notes
+        $JournalPermissions = Get-DelegateFolderPermissions @folderParams -FolderName Journal
     
         $DelegateObjects = [PSCustomObject]@{
             Delegates              = @()
